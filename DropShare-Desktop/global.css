@@ -1,0 +1,42 @@
+@import "tailwindcss";
+
+* {
+  box-sizing: border-box;
+  user-select: none;
+  font-family: "Mea Culpa", serif;
+  font-style: italic;
+}
+*::-webkit-scrollbar {
+  width: 3px;
+  background: transparent;
+  background-color: rgba(0, 0, 0, 0.4);
+  backdrop-filter: blur(2px);
+}
+::-webkit-scrollbar-thumb {
+  background: #00aff0;
+  border-radius: 10px;
+  cursor: grab;
+}
+
+body,
+html,
+#root {
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  height: 100vh;
+}
+
+#drag {
+  -webkit-app-region: drag;
+  width: 100%;
+}
+
+.main {
+  display: flex;
+  width: 100%;
+  height: calc(100vh - 60px);
+  flex-direction: column;
+  background-image: url("../src/assets/wavy-lines.svg");
+  background-size: cover;
+}
