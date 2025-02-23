@@ -2,8 +2,8 @@
   "compilerOptions": {
     "typeRoots": ["./node_modules/@types", "./global.d.ts"],
     "target": "ESNext",
-    "module": "ESNext",
-    "moduleResolution": "node",
+    "module": "Node16",
+    "moduleResolution": "node16",
     "esModuleInterop": true,
     "allowSyntheticDefaultImports": true,
     "strict": true,

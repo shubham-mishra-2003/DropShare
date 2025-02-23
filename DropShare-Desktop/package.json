@@ -1,5 +1,6 @@
 {
   "name": "dropshare-desktop",
+  "productName": "DropShare",
   "version": "1.0.0",
   "description": "An Electron application with React and TypeScript",
   "main": "./out/main/index.js",
@@ -23,6 +24,7 @@
   "dependencies": {
     "@electron-toolkit/preload": "^3.0.1",
     "@electron-toolkit/utils": "^3.0.0",
+    "goober": "^2.1.16",
     "lucide-react": "^0.475.0",
     "postcss": "^8.5.1",
     "react-hot-toast": "^2.5.1",
@@ -53,9 +55,10 @@
   },
   "build": {
     "appId": "com.dropshare.id",
-    "productName": "Dropshare-Desktop",
+    "productName": "Dropshare",
+    "icon": "/public/dropshare.ico",
     "win": {
-      "icon": "./src/assets/images/dropshareLogo.png"
+      "icon": "/public/dropshare.ico"
     }
   }
 }

@@ -2,7 +2,7 @@ import loadingImage from "./images/loading-image.png";
 import logoImage from "./images/dropshareLogo.png";
 import sunIcon from "./icons/sun.png";
 import moonIcon from "./icons/moon.png";
-import contrastIcon from "./icons/dark-light.png";
+import systemIcon from "./icons/deviceIcon.png";
 import shareIcon from "./icons/share.png";
 import searchIcon from "./icons/search.png";
 import downloadIcon from "./icons/downloads.png";
@@ -28,10 +28,11 @@ import folderOpenIcon from "./icons/folder-open.png";
 import folderClosedIcon from "./icons/folder-closed.png";
 import dropdownOpenIcon from "./icons/chevron-up.png";
 import dropdownClosedIcon from "./icons/chevron-down.png";
+import checkIcon from "./icons/check.png";
 
 const icons = {
   sun: sunIcon,
-  contrast: contrastIcon,
+  system: systemIcon,
   share: shareIcon,
   moon: moonIcon,
   search: searchIcon,
@@ -57,6 +58,7 @@ const icons = {
   folderClosed: folderClosedIcon,
   dropdownClosed: dropdownClosedIcon,
   dropdownOpen: dropdownOpenIcon,
+  check: checkIcon,
 };
 
 const images = {

@@ -1,8 +1,9 @@
 import React, { useEffect, useRef } from "react";
-import { Check, Moon, Sun, SunMoon } from "lucide-react";
 
 import { useTheme } from "../hooks/ThemeProvider";
 import { Colors } from "../constants/Colors";
+import Icon from "./Icon";
+import { icons } from "../assets";
 
 const modes = [
   { value: "system", label: "System" },
@@ -34,25 +35,27 @@ const ThemeSwitch = () => {
   return (
     <div className="relative" ref={dropdownRef}>
       <div
-        className={`w-fit cursor-pointer p-1 rounded-[8px] ${
+        className={`w-fit cursor-pointer p-1 flex items-center justify-center rounded-[8px] ${
           colorScheme == "dark" ? "hover:bg-blue-500" : "hover:bg-blue-300"
         }`}
-        style={{
-          color: Colors[colorScheme].text,
-        }}
         onClick={() => setOpen(!open)}
       >
-        {theme == "system" ? (
-          <SunMoon size={30} />
-        ) : theme == "dark" ? (
-          <Moon size={30} />
-        ) : (
-          <Sun size={30} />
-        )}
+        <Icon
+          src={
+            theme == "system"
+              ? icons.system
+              : theme == "dark"
+                ? icons.moon
+                : icons.sun
+          }
+          height={25}
+          width={30}
+          filter={1}
+        />
       </div>
       {open && (
         <div
-          className="w-fit gap-1 flex flex-col p-1 rounded-xl absolute top-10 right-0"
+          className="w-32 gap-1 flex flex-col p-1 rounded-xl absolute top-10 right-0"
           style={{
             background: "transparent",
             backgroundColor: Colors[colorScheme].background,
@@ -71,9 +74,6 @@ const ThemeSwitch = () => {
                     : "bg-[#88c0ff]"
                   : ""
               }`}
-              style={{
-                color: Colors[colorScheme].text,
-              }}
               key={mode.value}
               onClick={() => {
                 setTheme(mode.value);
@@ -81,10 +81,9 @@ const ThemeSwitch = () => {
               }}
             >
               {mode.label}
-              <Check
-                size={20}
-                className={theme === mode.value ? "opacity-100" : "opacity-0"}
-              />
+              {theme === mode.value && (
+                <Icon height={20} width={20} src={icons.check} />
+              )}
             </div>
           ))}
         </div>

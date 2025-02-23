@@ -4,7 +4,6 @@ import { electronApp, optimizer, is } from "@electron-toolkit/utils";
 import { images } from "../../src/assets";
 import { exec } from "child_process";
 import fs from "fs";
-import Toast from "../../src/components/Toast";
 
 // import * as mtp from "node-mtp";
 
@@ -21,7 +20,7 @@ function createWindow(): void {
     minWidth: 500,
     minimizable: true,
     show: false,
-    icon: path.join(__dirname, "../../src/assets/images/dropshareLogo.png"),
+    icon: path.join(__dirname, "/public/dropshare.ico"),
     autoHideMenuBar: true,
     ...(process.platform === "linux" ? { icon } : {}),
     frame: false,
@@ -205,7 +204,7 @@ async function getLinuxDrives() {
               total: number;
               free: number;
             } => drive !== null,
-          ); // Remove null values
+          );
 
         resolve(drives);
       },
@@ -227,36 +226,63 @@ ipcMain.handle("get-drives", async () => {
   }
 });
 
-ipcMain.handle("get-files", async (_, drive) => {
+interface FileNode {
+  name: string;
+  path: string;
+  type: "file" | "directory";
+  children?: FileNode[];
+}
+
+ipcMain.handle("get-files", async (_, drive: string): Promise<FileNode> => {
   if (!drive) {
-    Toast({ type: "error", message: "No drive provided!" });
-    return [];
+    return { name: "Error", path: "", type: "directory", children: [] };
   }
 
   let absoluteDrive = /^[A-Z]$/i.test(drive) ? `${drive}:/` : drive;
 
-  if (path.isAbsolute(absoluteDrive)) {
-    return new Promise((resolve) => {
-      fs.readdir(absoluteDrive, { withFileTypes: true }, (err, files) => {
-        if (err) {
-          Toast({
-            type: "error",
-            message: `Error reading files in ${absoluteDrive}:`,
-          });
-          return resolve([]);
-        }
-
-        const fileNames = files.map((file) => file.name);
-        resolve(fileNames);
-      });
-    });
-  } else {
-    Toast({
-      type: "error",
-      message: `Still an invalid drive path: ${absoluteDrive}`,
-    });
-    return [];
+  if (!path.isAbsolute(absoluteDrive)) {
+    return { name: "Invalid Drive", path: "", type: "directory", children: [] };
   }
+
+  function getDirectoryTree(dirPath: string): FileNode {
+    let children: FileNode[] = [];
+
+    try {
+      const files = fs.readdirSync(dirPath, { withFileTypes: true });
+
+      children = files
+        .filter(
+          (file) =>
+            file.name !== "$RECYCLE.BIN" &&
+            file.name !== "System Volume Information",
+        )
+        .map<FileNode>((file) => {
+          const fullPath = path.join(dirPath, file.name);
+
+          return {
+            name: file.name,
+            path: fullPath,
+            type: file.isDirectory() ? "directory" : "file",
+            children: file.isDirectory()
+              ? (getDirectoryTree(fullPath).children ?? [])
+              : undefined,
+          };
+        });
+    } catch (error: any) {
+      if (error.code !== "EPERM") {
+        console.error(`Error reading directory: ${dirPath}`, error);
+      }
+    }
+
+    return {
+      name: path.basename(dirPath) || dirPath,
+      path: dirPath,
+      type: "directory",
+      children: children ?? [],
+    };
+  }
+
+  return getDirectoryTree(absoluteDrive);
 });
 
 // Handle MTP devices (phones, cameras, etc.)

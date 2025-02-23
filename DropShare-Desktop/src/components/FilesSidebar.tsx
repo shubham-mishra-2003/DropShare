@@ -1,92 +1,90 @@
-import { useEffect, useState } from "react";
-import Toast from "./Toast";
-import { useNavigate, useParams } from "react-router-dom";
 import { useTheme } from "../hooks/ThemeProvider";
 import { Colors } from "../constants/Colors";
 import Icon from "./Icon";
 import { icons } from "../assets";
+import { useState } from "react";
 
-const FilesSidebar = () => {
-  const { drive } = useParams<{ drive: string }>();
-  const [files, setFiles] = useState<string[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [dropDown, setDropDown] = useState(false);
-  const navigate = useNavigate();
+const FilesSidebar = ({
+  nodes,
+  loading,
+}: {
+  nodes: FileNode[];
+  loading: boolean;
+}) => {
+  const [dropdown, setDropDown] = useState<{
+    id: string | null;
+    open: boolean;
+  }>({
+    id: null,
+    open: false,
+  });
+
+  const toggleDropdown = (id: string) => {
+    setDropDown((prev) => ({
+      id: prev.id === id && prev.open ? null : id,
+      open: prev.id !== id || prev.open,
+    }));
+  };
+
   const { colorScheme } = useTheme();
 
-  useEffect(() => {
-    if (!drive) {
-      Toast({ type: "error", message: "No drive selected in URL!" });
-      return;
-    }
-    window.electron
-      .getFiles(decodeURIComponent(drive))
-      .then((data: string[] | undefined) => {
-        if (Array.isArray(data)) {
-          setFiles(data);
-        } else {
-          Toast({
-            type: "error",
-            message: `Invalid response from getFiles: ${data}`,
-          });
-          setFiles([]);
-        }
-        setLoading(false);
-      })
-      .catch((error) => {
-        Toast({ type: "error", message: `Error fetching files: ${error}` });
-        setFiles([]);
-        setLoading(false);
-      });
-  }, [drive]);
-
   return (
-    <div className="flex flex-col gap-1 w-full h-full overflow-y-auto px-1 py-2">
+    <div className="flex flex-col gap-1 w-full h-full overflow-y-auto px-1 py-2 overflow-x-hidden">
       {loading ? (
         <Loading />
-      ) : files && files.length > 0 ? (
-        files.map((file, index) => (
-          <div
-            onClick={() => { }}
-            className="flex flex-col h-auto group w-full items-center p-2 border-2 cursor-pointer rounded-lg gap-3"
-            style={{
-              background: Colors[colorScheme].transparent,
-              borderColor: Colors[colorScheme].border,
-              borderWidth: 2,
-            }}
-            key={index}
-          >
-            <div className="flex items-center justify-between w-full">
-              <div className="flex items-center gap-3">
-                <Icon
-                  src={icons.folderClosed}
-                  filter={1}
-                  height={20}
-                  width={20}
-                />
-                <div className="font-bold text-[16px] truncate">{file}</div>
+      ) : (
+        nodes
+          .filter((file) => file.type == "directory")
+          .map((folder, index) => (
+            <div
+              onClick={() => toggleDropdown(folder.path)}
+              style={{ background: Colors[colorScheme].transparent }}
+              key={index}
+              title={folder.path}
+              className="flex w-full justify-center rounded-lg p-2 px-3 max-h-fit min-h-14 flex-col"
+            >
+              <div className="flex justify-between items-center w-full">
+                <div className="flex items-center gap-3 font-bold text-lg">
+                  <Icon
+                    src={
+                      dropdown.id === folder.path && dropdown.open
+                        ? icons.folderOpen
+                        : icons.folderClosed
+                    }
+                    filter={1}
+                    height={30}
+                    width={30}
+                  />
+                  {folder.name}
+                </div>
+                <div
+                  className="p-1 items-center justify-center flex"
+                  onClick={() => toggleDropdown(folder.path)}
+                >
+                  <Icon
+                    src={
+                      folder.path == dropdown.id
+                        ? icons.dropdownOpen
+                        : icons.dropdownClosed
+                    }
+                  />
+                </div>
               </div>
-              <div
-                onClick={() => setDropDown((prev) => !prev)}
-                className={`flex z-50 opacity-0 cursor-pointer items-center justify-center group-hover:opacity-100 rounded-lg p-1 ${colorScheme == "dark" ? "hover:bg-slate-600" : "hover:bg-blue-300"}`}
-              >
-                <Icon
-                  src={dropDown ? icons.dropdownOpen : icons.dropdownClosed}
-                  filter={1}
-                  height={20}
-                  width={20}
-                />
+              <div className="pl-6 flex flex-col justify-center gap-1">
+                {dropdown.id === folder.path &&
+                  dropdown.open &&
+                  Array.isArray(folder.children) &&
+                  folder.children.length > 0 &&
+                  folder.children
+                    .filter((folder) => folder.type == "directory")
+                    .map((child) => (
+                      <div className="flex items-center gap-3">
+                        <Icon src={icons.folderClosed} height={20} width={20} />
+                        {child.name}</div>
+                    ))}
               </div>
             </div>
-            {dropDown && (
-              <div>
-                Dropdown showing folder or inside the folder clicked
-              </div>
-            )}
-          </div>
-        ))
-      ) : (
-        <div>No files found.</div>
+          ))
       )}
     </div>
   );
@@ -101,9 +99,7 @@ const Loading = () => {
       {Array.from({ length: 20 }).map((_, index) => (
         <div
           key={index}
-          style={{
-            backgroundColor: Colors[colorScheme].transparent,
-          }}
+          style={{ backgroundColor: Colors[colorScheme].transparent }}
           className="flex p-2 text-2xl font-bold w-full rounded-lg animate-pulse"
         >
           Getting files...

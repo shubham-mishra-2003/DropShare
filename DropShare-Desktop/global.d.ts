@@ -14,6 +14,12 @@ declare global {
     free: number;
     name: string;
   }
+  interface FileNode {
+    name: string;
+    path: string;
+    type: "file" | "directory";
+    children?: FileNode[];
+  }
 }
 
 // declare module "node-mtp" {

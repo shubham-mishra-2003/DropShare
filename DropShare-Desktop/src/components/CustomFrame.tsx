@@ -22,7 +22,7 @@ const CustomFrame = () => {
         background: Colors[colorScheme].background,
       }}
     >
-      <div className="flex items-center p-2 gap-2 w-full">
+      <div className="flex items-center p-2 gap-5 w-full">
         <Sidebar />
         <div id="drag" className="flex items-center gap-2">
           <img
@@ -49,7 +49,7 @@ const CustomFrame = () => {
           <Icon height={20} width={20} src={icons.maximize} filter={1} />
         </button>
         <button
-          className={`border-none cursor-pointer active:scale-90 rounded-[5px] w-10 items-center flex justify-center hover:bg-red-500 h-9`}
+          className={`border-none cursor-pointer active:scale-90 rounded w-10 items-center flex justify-center hover:bg-red-500 h-9`}
           onClick={handleClose}
         >
           <Icon filter={1} height={20} width={20} src={icons.close} />

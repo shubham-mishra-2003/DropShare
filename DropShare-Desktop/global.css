@@ -35,7 +35,7 @@ html,
 .main {
   display: flex;
   width: 100%;
-  height: calc(100vh - 60px);
+  height: calc(100vh - 55px);
   flex-direction: column;
   background-image: url("../src/assets/wavy-lines.svg");
   background-size: cover;

@@ -1,4 +1,3 @@
-import React from "react";
 import { Colors } from "../constants/Colors";
 import { useTheme } from "../hooks/ThemeProvider";
 import Icon from "./Icon";
