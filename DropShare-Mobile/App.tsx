@@ -1,10 +1,13 @@
-import React, {useEffect, useRef, useState} from 'react';
-import {Animated, BackHandler, Text, View} from 'react-native';
-import {Toast} from './src/components/Toasts';
-import {ThemeProvider} from './src/hooks/ThemeProvider';
-import {splashScreenStyles} from './src/constants/Styles';
-import {images} from './src/assets/assets';
-import RootLayout from './src/RootLayout';
+import React, { useEffect, useRef, useState } from "react";
+import { Animated, BackHandler, Text, View } from "react-native";
+import { Toast } from "./src/components/Toasts";
+import { ThemeProvider, useTheme } from "./src/hooks/ThemeProvider";
+import { splashScreenStyles } from "./src/constants/Styles";
+import { images } from "./src/assets";
+import RootLayout from "./src/RootLayout";
+import { SafeAreaView } from "react-native-safe-area-context";
+import { requestPermissions } from "./src/utils/permissionRequests";
+import { indexFiles } from "./src/db/indexFiles";
 
 export default function App() {
   const [isSplashVisible, setIsSplashVisible] = useState(true);
@@ -16,7 +19,12 @@ export default function App() {
       duration: 1000,
       useNativeDriver: true,
     }).start(() => {
-      setTimeout(() => setIsSplashVisible(false), 500);
+      setTimeout(() => {
+        setIsSplashVisible(false);
+        setTimeout(() => {
+          requestPermissions();
+        }, 1000);
+      }, 500);
     });
   }, [scaleAnim, setIsSplashVisible]);
 
@@ -25,7 +33,7 @@ export default function App() {
     const backAction = () => {
       if (backPressCount.current === 0) {
         backPressCount.current += 1;
-        Toast('Press back again to exit');
+        Toast("Press back again to exit");
         setTimeout(() => {
           backPressCount.current = 0;
         }, 2000);
@@ -37,27 +45,34 @@ export default function App() {
       return true;
     };
     const backHandler = BackHandler.addEventListener(
-      'hardwareBackPress',
-      backAction,
+      "hardwareBackPress",
+      backAction
     );
     return () => backHandler.remove();
   }, []);
 
-  if (isSplashVisible) {
-    return (
-      <View style={splashScreenStyles.splashContainer}>
-        <Animated.Image
-          source={images.logo}
-          style={[splashScreenStyles.logo, {transform: [{scale: scaleAnim}]}]}
-        />
-        <Text style={splashScreenStyles.splashText}>Welcome to DropShare</Text>
-      </View>
-    );
-  }
+  useEffect(() => {
+    indexFiles();
+  }, []);
 
   return (
     <ThemeProvider>
-      <RootLayout />
+      {isSplashVisible ? (
+        <View style={splashScreenStyles.splashContainer}>
+          <Animated.Image
+            source={images.logo}
+            style={[
+              splashScreenStyles.logo,
+              { transform: [{ scale: scaleAnim }] },
+            ]}
+          />
+          <Text style={splashScreenStyles.splashText}>
+            Welcome to DropShare
+          </Text>
+        </View>
+      ) : (
+        <RootLayout />
+      )}
     </ThemeProvider>
   );
 }

@@ -1,8 +1,8 @@
-import React, {useEffect, useRef} from 'react';
-import {Animated, StatusBar, Text, View} from 'react-native';
-import {loadingStyles} from '../constants/Styles';
-import {images} from '../assets/assets';
-import {useTheme} from '../hooks/ThemeProvider';
+import React, { useEffect, useRef } from "react";
+import { Animated, StatusBar, Text, View } from "react-native";
+import { loadingStyles } from "../constants/Styles";
+import { images } from "../assets";
+import { useTheme } from "../hooks/ThemeProvider";
 
 const Loading = () => {
   const rotation = useRef(new Animated.Value(0)).current;
@@ -13,7 +13,7 @@ const Loading = () => {
         toValue: 1,
         duration: 2000,
         useNativeDriver: true,
-      }),
+      })
     );
     rotateAnimation.start();
 
@@ -22,10 +22,10 @@ const Loading = () => {
 
   const rotationInterpolation = rotation.interpolate({
     inputRange: [0, 1],
-    outputRange: ['0deg', '360deg'],
+    outputRange: ["0deg", "360deg"],
   });
 
-  const {colorScheme} = useTheme();
+  const { colorScheme } = useTheme();
 
   const styles = loadingStyles(colorScheme);
 
@@ -33,7 +33,10 @@ const Loading = () => {
     <View style={styles.container}>
       <Animated.Image
         source={images.loading}
-        style={[styles.image, {transform: [{rotate: rotationInterpolation}]}]}
+        style={[
+          styles.image,
+          { transform: [{ rotate: rotationInterpolation }] },
+        ]}
       />
       <StatusBar />
       <Text style={styles.text}>DropShare</Text>

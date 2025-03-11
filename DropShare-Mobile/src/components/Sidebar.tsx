@@ -1,16 +1,16 @@
-import React from 'react';
+import React from "react";
 import {
   Animated,
   Text,
   View,
   TouchableWithoutFeedback,
   Pressable,
-} from 'react-native';
-import { sidebarStyles } from '../constants/Styles';
-import { useTheme } from '../hooks/ThemeProvider';
-import Icon from './Icon';
-import { icons, images } from '../assets/assets';
-import { navigate } from '../utils/NavigationUtil';
+} from "react-native";
+import { sidebarStyles } from "../constants/Styles";
+import { useTheme } from "../hooks/ThemeProvider";
+import Icon from "./Icon";
+import { icons, images } from "../assets";
+import { navigate } from "../utils/NavigationUtil";
 
 interface sidebarProps {
   slideAnim: Animated.Value;
@@ -21,9 +21,9 @@ const Sidebar = ({ slideAnim, toggleSidebar }: sidebarProps) => {
   const { colorScheme } = useTheme();
   const styles = sidebarStyles(colorScheme);
   const sidebarOptions = [
-    { title: 'Bin', icon: icons.bin, function: 'bin' },
-    { title: 'Settings', icon: icons.setting, function: 'setting' },
-    { title: 'Help and feedback', icon: icons.help, function: 'help' },
+    { title: "Bin", icon: icons.bin, function: "bin" },
+    { title: "Settings", icon: icons.setting, function: "setting" },
+    { title: "Help and feedback", icon: icons.help, function: "help" },
   ];
 
   return (
@@ -32,7 +32,8 @@ const Sidebar = ({ slideAnim, toggleSidebar }: sidebarProps) => {
         <View style={styles.overlay} />
       </TouchableWithoutFeedback>
       <Animated.View
-        style={[styles.sidebar, { transform: [{ translateX: slideAnim }] }]}>
+        style={[styles.sidebar, { transform: [{ translateX: slideAnim }] }]}
+      >
         <View style={styles.logo}>
           <Icon source={images.logo} height={35} width={35} filter={0} />
           <Text style={styles.logoText}>DropShare</Text>
@@ -45,7 +46,8 @@ const Sidebar = ({ slideAnim, toggleSidebar }: sidebarProps) => {
                 toggleSidebar();
               }}
               key={index}
-              style={styles.options}>
+              style={styles.options}
+            >
               <Icon source={options.icon} height={20} width={20} filter={1} />
               <Text style={styles.optionsText}>{options.title}</Text>
             </Pressable>

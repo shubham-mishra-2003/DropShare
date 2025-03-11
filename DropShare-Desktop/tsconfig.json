@@ -1,21 +1,7 @@
 {
-  "compilerOptions": {
-    "typeRoots": ["./node_modules/@types", "./global.d.ts"],
-    "target": "ESNext",
-    "module": "Node16",
-    "moduleResolution": "node16",
-    "esModuleInterop": true,
-    "allowSyntheticDefaultImports": true,
-    "strict": true,
-    "jsx": "react-jsx",
-    "baseUrl": "."
-  },
-  "include": [
-    "src/**/*",
-    "electron/**/*",
-    "src/**/**/*",
-    "electron/preload/*.d.ts",
-    "index.html",
-    "global.d.ts"
+  "files": [],
+  "references": [
+    { "path": "./tsconfig.node.json" },
+    { "path": "./tsconfig.web.json" }
   ]
 }

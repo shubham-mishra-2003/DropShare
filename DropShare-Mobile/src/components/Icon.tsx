@@ -1,7 +1,7 @@
-import React, {FC} from 'react';
-import {Image} from 'react-native';
-import {IconsStyles} from '../constants/Styles';
-import {useTheme} from '../hooks/ThemeProvider';
+import React, { FC } from "react";
+import { Image } from "react-native";
+import { IconsStyles } from "../constants/Styles";
+import { useTheme } from "../hooks/ThemeProvider";
 
 interface IconProps {
   height: number;
@@ -10,8 +10,8 @@ interface IconProps {
   filter: number;
 }
 
-const Icon: FC<IconProps> = ({height, width, source, filter = 1}) => {
-  const {colorScheme} = useTheme();
+const Icon: FC<IconProps> = ({ height, width, source, filter = 1 }) => {
+  const { colorScheme } = useTheme();
 
   const styles = IconsStyles(colorScheme, height, width, filter);
 
