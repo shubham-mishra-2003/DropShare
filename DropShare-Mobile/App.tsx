@@ -1,13 +1,11 @@
 import React, { useEffect, useRef, useState } from "react";
 import { Animated, BackHandler, Text, View } from "react-native";
 import { Toast } from "./src/components/Toasts";
-import { ThemeProvider, useTheme } from "./src/hooks/ThemeProvider";
+import { ThemeProvider } from "./src/hooks/ThemeProvider";
 import { splashScreenStyles } from "./src/constants/Styles";
 import { images } from "./src/assets";
 import RootLayout from "./src/RootLayout";
-import { SafeAreaView } from "react-native-safe-area-context";
 import { requestPermissions } from "./src/utils/permissionRequests";
-import { indexFiles } from "./src/db/indexFiles";
 
 export default function App() {
   const [isSplashVisible, setIsSplashVisible] = useState(true);
@@ -49,10 +47,6 @@ export default function App() {
       backAction
     );
     return () => backHandler.remove();
-  }, []);
-
-  useEffect(() => {
-    indexFiles();
   }, []);
 
   return (

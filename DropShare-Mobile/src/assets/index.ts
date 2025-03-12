@@ -24,7 +24,8 @@ import folderPlusIcon from "./icons/folder-plus.png";
 import archiveIcon from './icons/archive.png';
 import optionsIcon from "./icons/options.png";
 import folderCheckIcon from "./icons/folder-check.png";
-import checkIcon from "./icons/circle-check.png"
+import checkIcon from "./icons/circle-check.png";
+import noCameraIcon from "./icons/camera-off.png";
 
 const icons = {
   sun: sunIcon,
@@ -51,7 +52,8 @@ const icons = {
   archive: archiveIcon,
   options: optionsIcon,
   check: checkIcon,
-  folderCheck: folderCheckIcon
+  folderCheck: folderCheckIcon,
+  cameraOff: noCameraIcon
 };
 
 const images = {

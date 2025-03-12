@@ -146,7 +146,8 @@ export const filesStyle = (colorScheme: "light" | "dark") =>
       gap: 10,
       flexDirection: "row",
       flexWrap: "wrap",
-      padding: 10,
+      justifyContent: 'center',
+      alignItems: 'center'
     },
     categoryCard: {
       height: 100,
@@ -529,6 +530,7 @@ export const nearByDevicesStyles = (colorScheme: "dark" | "light") => StyleSheet
     flex: 1,
     backgroundColor: Colors[colorScheme].background,
     alignItems: "center",
+    justifyContent: 'flex-start',
     gap: 5,
     width: '100%'
   },
@@ -557,7 +559,7 @@ export const nearByDevicesStyles = (colorScheme: "dark" | "light") => StyleSheet
     backgroundColor: Colors[colorScheme].tint,
     padding: 20,
     borderRadius: 50,
-    marginHorizontal: 35,
+    marginHorizontal: 30,
     marginVertical: 5
   },
   shareText: {

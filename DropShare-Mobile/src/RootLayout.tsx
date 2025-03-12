@@ -2,11 +2,9 @@ import React, { useEffect, useRef, useState } from "react";
 import { NavigationContainer } from "@react-navigation/native";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import { enableScreens } from "react-native-screens";
-import Loading from "./components/Loading";
-import { navigate, navigationRef } from "./utils/NavigationUtil";
-import SharingScreen from "./pages/FileSharingScreen";
+import { navigationRef } from "./utils/NavigationUtil";
 import SettingsPage from "./pages/SettingPage";
-import { Animated, StatusBar, TouchableOpacity, View } from "react-native";
+import { Animated, StatusBar } from "react-native";
 import Sidebar from "./components/Sidebar";
 import { logoHeadStyles } from "./constants/Styles";
 import { useTheme } from "./hooks/ThemeProvider";
@@ -21,7 +19,7 @@ import FilesList from "./components/FileManager/FilesList";
 import StorageList from "./components/FileManager/StorageList";
 import FileSharingScreen from "./pages/FileSharingScreen";
 import RecievedFile from "./components/FileManager/RecievedFile";
-import StorageScreen from "./pages/StorageScreen";
+import { indexFiles } from "./db/indexFiles";
 
 enableScreens();
 
@@ -29,6 +27,10 @@ const RootLayout = () => {
   const { colorScheme } = useTheme();
   const styles = logoHeadStyles(colorScheme);
   const [visible, setVisible] = useState(false);
+
+  useEffect(() => {
+    indexFiles();
+  }, []);
 
   const slideAnim = useRef(new Animated.Value(-screenWidth)).current;
 
@@ -48,16 +50,7 @@ const RootLayout = () => {
       }).start();
     }
   };
-  const [loading, setLoading] = useState(true);
   const Stack = createNativeStackNavigator();
-
-  useEffect(() => {
-    setLoading(false);
-  }, []);
-
-  if (loading) {
-    return <Loading />;
-  }
 
   return (
     <SafeAreaProvider>

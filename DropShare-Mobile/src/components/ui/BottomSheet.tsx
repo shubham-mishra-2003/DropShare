@@ -1,10 +1,4 @@
-import {
-  ScrollView,
-  StyleSheet,
-  Text,
-  TouchableWithoutFeedback,
-  View,
-} from "react-native";
+import { StyleSheet, View } from "react-native";
 import React from "react";
 import DropShareModal from "./Modal";
 import { useTheme } from "../../hooks/ThemeProvider";
@@ -14,24 +8,23 @@ interface bottomSheerProps {
   children: React.ReactNode;
   visible: boolean;
   onRequestClose?: () => void;
+  height?: number;
 }
 
 const BottomSheet = ({
   children,
   visible,
   onRequestClose,
+  height = 300,
 }: bottomSheerProps) => {
   const { colorScheme } = useTheme();
-  const styles = bottomSheetStyles(colorScheme);
+  const styles = bottomSheetStyles(colorScheme, height);
 
   return (
     <DropShareModal visible={visible} onRequestClose={onRequestClose}>
       <View style={styles.overlay}>
         <View style={styles.container}>
           <View style={styles.line}></View>
-          {/* <ScrollView style={{ height: "100%", width: "100%", paddingTop: 20 }}>
-            {children}
-          </ScrollView> */}
           {children}
         </View>
       </View>
@@ -41,7 +34,7 @@ const BottomSheet = ({
 
 export default BottomSheet;
 
-const bottomSheetStyles = (colorScheme: "dark" | "light") =>
+const bottomSheetStyles = (colorScheme: "dark" | "light", height: number) =>
   StyleSheet.create({
     overlay: {
       position: "absolute",
@@ -52,6 +45,8 @@ const bottomSheetStyles = (colorScheme: "dark" | "light") =>
       justifyContent: "flex-end",
     },
     line: {
+      position: "absolute",
+      top: 10,
       width: 40,
       height: 5,
       backgroundColor: "#bbb",
@@ -59,7 +54,7 @@ const bottomSheetStyles = (colorScheme: "dark" | "light") =>
     },
     container: {
       width: "100%",
-      height: 500,
+      height: height,
       backgroundColor: Colors[colorScheme].background,
       borderTopLeftRadius: 40,
       borderTopRightRadius: 40,
@@ -70,5 +65,6 @@ const bottomSheetStyles = (colorScheme: "dark" | "light") =>
       padding: 10,
       justifyContent: "center",
       alignItems: "center",
+      paddingTop: 30
     },
   });

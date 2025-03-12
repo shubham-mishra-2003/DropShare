@@ -2,14 +2,7 @@ import { PermissionsAndroid, Alert, Platform, Permission, Linking } from "react-
 
 export async function requestPermissions() {
   try {
-    const permissions: Permission[] = [
-      PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION,
-      PermissionsAndroid.PERMISSIONS.ACCESS_COARSE_LOCATION,
-      PermissionsAndroid.PERMISSIONS.NEARBY_WIFI_DEVICES,
-      PermissionsAndroid.PERMISSIONS.BLUETOOTH_SCAN,
-      PermissionsAndroid.PERMISSIONS.BLUETOOTH_CONNECT,
-      // PermissionsAndroid.PERMISSIONS.READ_EXTERNAL_STORAGE,
-    ];
+    const permissions: Permission[] = [];
 
     if (Number(Platform.Version) >= 33) {
       permissions.push(

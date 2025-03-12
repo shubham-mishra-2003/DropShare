@@ -58,38 +58,53 @@ const RecievedFile = () => {
         <ActivityIndicator color={Colors[colorScheme].tint} size="large" />
       ) : (
         <ScrollView contentContainerStyle={styles.scrollContainer}>
-          <View style={styles.filesView}>
-            {recievedFiles.map((file) => (
-              <TouchableOpacity
-                onPress={() => {
-                  if (
-                    selectedFiles.some(
-                      (selected) => selected.path === file.path
-                    )
-                  ) {
-                    setSelectedFiles((prev) =>
-                      prev.filter((selected) => selected.path !== file.path)
-                    );
-                  } else if (selectedFiles.length > 0) {
-                    setSelectedFiles((prev) => [...prev, file]);
-                  } else {
-                    navigate("fileviewer", { file });
+          {recievedFiles.length == 0 ? (
+            <Text
+              style={{
+                fontSize: 20,
+                fontWeight: "bold",
+                textAlign: "center",
+                color: "#bbb",
+              }}
+            >
+              No files in the Folder
+            </Text>
+          ) : (
+            <View style={styles.filesView}>
+              {recievedFiles.map((file) => (
+                <TouchableOpacity
+                  onPress={() => {
+                    if (
+                      selectedFiles.some(
+                        (selected) => selected.path === file.path
+                      )
+                    ) {
+                      setSelectedFiles((prev) =>
+                        prev.filter((selected) => selected.path !== file.path)
+                      );
+                    } else if (selectedFiles.length > 0) {
+                      setSelectedFiles((prev) => [...prev, file]);
+                    } else {
+                      navigate("fileviewer", { file });
+                    }
+                  }}
+                  onLongPress={() =>
+                    setSelectedFiles((prev) => [...prev, file])
                   }
-                }}
-                onLongPress={() => setSelectedFiles((prev) => [...prev, file])}
-                style={styles.fileItem}
-                key={file.path}
-              >
-                <Image
-                  source={{ uri: `file://${file.path}` }}
-                  style={styles.image}
-                />
-                <View style={styles.textView}>
-                  <Text style={styles.text}>{formatFileSize(file.size)}</Text>
-                </View>
-              </TouchableOpacity>
-            ))}
-          </View>
+                  style={styles.fileItem}
+                  key={file.path}
+                >
+                  <Image
+                    source={{ uri: `file://${file.path}` }}
+                    style={styles.image}
+                  />
+                  <View style={styles.textView}>
+                    <Text style={styles.text}>{formatFileSize(file.size)}</Text>
+                  </View>
+                </TouchableOpacity>
+              ))}
+            </View>
+          )}
         </ScrollView>
       )}
     </View>

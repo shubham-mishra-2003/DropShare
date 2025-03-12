@@ -8,10 +8,9 @@ const scanDirectoryRecursive = async (directoryPath: string): Promise<RNFS.ReadD
         const files = await RNFS.readDir(directoryPath);
 
         for (const file of files) {
-            results.push(file); // Store file or folder
-
+            results.push(file);
             if (file.isDirectory()) {
-                const subFiles = await scanDirectoryRecursive(file.path); // Recursive scan
+                const subFiles = await scanDirectoryRecursive(file.path);
                 results = [...results, ...subFiles];
             }
         }

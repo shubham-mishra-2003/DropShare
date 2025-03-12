@@ -14,7 +14,7 @@ import { Colors } from "../constants/Colors";
 import { icons } from "../assets";
 import Icon from "./Icon";
 import { getStorageInfo, getFileCounts } from "../utils/FileSystemUtil";
-import NearbyDevices from "./Sharing/NearbyDevices";
+import NearbyDevices from "./Sharing/DropshareConnect";
 import SearchComponent from "./SearchInput";
 import DropShareModal from "./ui/Modal";
 
@@ -38,6 +38,7 @@ const HomeContent: React.FC = () => {
     used: 0,
     total: 1,
     usedPercentage: 0,
+    free: 1,
   });
 
   const fetchData = async () => {
@@ -49,10 +50,13 @@ const HomeContent: React.FC = () => {
           ? (storageInfo.used / storageInfo.total) * 100
           : 0;
 
+      let freeSpace = storageInfo.total - storageInfo.used;
+
       setStorage({
         used: storageInfo.used,
         total: storageInfo.total,
         usedPercentage: storagePercentage,
+        free: freeSpace,
       });
 
       setFileCounts(fileCounts);
@@ -135,12 +139,29 @@ const HomeContent: React.FC = () => {
                   fontSize: 20,
                 }}
               >
-                Free: {storage.total - storage.used} GB
+                Free: {storage.free} GB
               </Text>
             </View>
           </View>
         </TouchableOpacity>
-
+        <TouchableOpacity
+          onPress={() => navigate("recieved")}
+          style={{
+            backgroundColor: Colors[colorScheme].itemBackground,
+            padding: 20,
+            borderRadius: 20,
+          }}
+        >
+          <Text
+            style={{
+              color: Colors[colorScheme].text,
+              fontSize: 20,
+              textAlign: "center",
+            }}
+          >
+            Recieved
+          </Text>
+        </TouchableOpacity>
         <View style={styles.categoriesContainer}>
           {categories.map((item) => (
             <TouchableOpacity
@@ -153,57 +174,6 @@ const HomeContent: React.FC = () => {
               <Text style={styles.categoryText}>{fileCounts[item.name]}</Text>
             </TouchableOpacity>
           ))}
-        </View>
-        <View
-          style={{
-            flexDirection: "row",
-            justifyContent: "space-between",
-            gap: 10,
-            flexWrap: "wrap",
-            padding: 10,
-          }}
-        >
-          <TouchableOpacity
-            onPress={() => navigate("recieved")}
-            style={{
-              padding: 10,
-              borderRadius: 20,
-              backgroundColor: Colors[colorScheme].itemBackground,
-              width: "48%",
-              height: 55,
-              justifyContent: "center",
-            }}
-          >
-            <Text
-              style={{
-                color: Colors[colorScheme].text,
-                fontSize: 20,
-                textAlign: "center",
-              }}
-            >
-              Recieved
-            </Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={{
-              padding: 10,
-              borderRadius: 20,
-              backgroundColor: Colors[colorScheme].itemBackground,
-              width: "48%",
-              height: 55,
-              justifyContent: "center",
-            }}
-          >
-            <Text
-              style={{
-                color: Colors[colorScheme].text,
-                fontSize: 20,
-                textAlign: "center",
-              }}
-            >
-              Hidden
-            </Text>
-          </TouchableOpacity>
         </View>
       </ScrollView>
       <NearbyDevices />

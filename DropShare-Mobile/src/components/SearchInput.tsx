@@ -104,9 +104,7 @@ const SearchComponent = () => {
                 >
                   {item.name}
                 </Text>
-                <Text style={{ color: "#bbb" }}>
-                  {item.isFile == 1 ? "File" : "Directory"}
-                </Text>
+                <Text style={{ color: "#bbb" }}>{item.path}</Text>
               </TouchableOpacity>
             ))
           ) : (

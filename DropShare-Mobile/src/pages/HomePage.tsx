@@ -1,5 +1,5 @@
 import React from "react";
-import { StyleSheet, TouchableOpacity, View } from "react-native";
+import { StyleSheet } from "react-native";
 import Header from "../components/Header";
 import { useTheme } from "../hooks/ThemeProvider";
 import { Colors } from "../constants/Colors";
@@ -22,7 +22,7 @@ const Home = ({ toggleSidebar }: homeProps) => {
 
   return (
     <SafeAreaView style={styles.mainView}>
-      <Header  page="home" onPress={toggleSidebar} />
+      <Header page="home" onPress={toggleSidebar} />
       <HomeContent />
     </SafeAreaView>
   );

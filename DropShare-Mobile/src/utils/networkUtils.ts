@@ -75,7 +75,7 @@ const startUdpDiscovery = async (
   if (!broadcastIp || localIP === "0.0.0.0") {
     console.error("Failed to get broadcast address or local IP");
     return;
-  }
+  } 
 
   socket.bind(UDP_PORT, () => {
     socket.setBroadcast(true);

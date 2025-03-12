@@ -2,7 +2,7 @@ import SQLite from "react-native-sqlite-storage";
 import RNFS from "react-native-fs";
 
 // Define the database storage path (similar to WhatsApp's structure)
-const dataPath = `${RNFS.ExternalStorageDirectoryPath}/Android/com.dropshare/databases`;
+const dataPath = `${RNFS.ExternalStorageDirectoryPath}/Android/media/com.dropshare/databases`;
 const dbName = "dropshare_files.db";
 
 // Ensure directory exists before opening DB
@@ -21,12 +21,6 @@ const db = SQLite.openDatabase(
     (error) => console.error("❌ Database error:", error)
 );
 
-export const deleteDatabase = () => {
-    db.transaction((tx) => {
-        tx.executeSql(`DELETE DATABASE dropshare_files.db`)
-    })
-}
-
 // Initialize Tables
 export const initializeDatabase = () => {
     db.transaction((tx) => {
@@ -38,8 +32,8 @@ export const initializeDatabase = () => {
                 size INTEGER DEFAULT 0,
                 ctime INTEGER DEFAULT NULL,
                 mtime INTEGER DEFAULT NULL,
-                isDirectory BOOLEAN DEFAULT FALSE, 
-                isFile BOOLEAN DEFAULT FALSE
+                isDirectory INTEGER DEFAULT 0, 
+                isFile INTEGER DEFAULT 0
             );`,
             [],
             () => console.log("✅ Files table created successfully"),
@@ -71,8 +65,8 @@ export const saveToDatabase = async (files: RNFS.ReadDirItem[]) => {
                     file.name,
                     file.path,
                     file.size || 0,
-                    file.isDirectory(),
-                    file.isFile(),
+                    file.isDirectory() ? 1 : 0, // Convert boolean to integer
+                    file.isFile() ? 1 : 0, // Convert boolean to integer
                     file.ctime ? file.ctime.getTime() : null,
                     file.mtime ? file.mtime.getTime() : null
                 ],
