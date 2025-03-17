@@ -1,7 +1,5 @@
 import * as mobilenet from "@tensorflow-models/mobilenet";
-import * as tf from "@tensorflow/tfjs";
 import RNFS from "react-native-fs";
-import { Image } from "react-native";
 
 // Load TensorFlow model
 let model: mobilenet.MobileNet | null = null;
@@ -17,7 +15,7 @@ export const loadModel = async () => {
 export const classifyImage = async (filePath: string) => {
     try {
         await loadModel();
-        const image = await Image.resolveAssetSource({ uri: `file://${filePath}` });
+        const image = { uri: `file://${filePath}` };
         const predictions = await model!.classify(image);
         return predictions.map((p) => p.className).join(", ");
     } catch (error) {

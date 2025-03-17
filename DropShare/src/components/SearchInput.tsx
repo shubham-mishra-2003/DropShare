@@ -23,13 +23,10 @@ const SearchComponent = () => {
 
   const handleSearch = async (text: string) => {
     setSearchQuery(text);
-
     if (!text.trim()) {
       setFilteredFiles([]);
       return;
     }
-
-    // Query the database using AI-powered search
     searchFiles(text, (results) => {
       setFilteredFiles(results);
     });

@@ -43,7 +43,7 @@ export const scanEntireStorage = async () => {
                 content_summary = await extractTextFromFile(file.path);
             }
         }
-        saveFileRecord(file, tags, content_summary);
+        await saveFileRecord(file, tags, content_summary);
     }
 
     console.log("✅ AI-enhanced scanning and storage complete!");

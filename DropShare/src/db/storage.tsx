@@ -8,4 +8,3 @@ export const storage = new MMKV({
 export const mmkvStorage = {
     setItem: (key: string, value: string)
 }
-wz
