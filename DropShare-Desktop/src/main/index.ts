@@ -1,11 +1,15 @@
-import { app, shell, BrowserWindow, ipcMain, dialog } from "electron";
+import { app, shell, BrowserWindow, ipcMain } from "electron";
 import { join } from "path";
 import { electronApp, optimizer, is } from "@electron-toolkit/utils";
 import icon from "../../resources/icon.png?asset";
 import { getWindowsDrives } from "../renderer/src/utils/getDrives";
 import { getFiles } from "../renderer/src/utils/getFiles";
-import { startTCPServer } from "../renderer/src/utils/tcpServer";
-import { startDeviceDiscovery } from "../renderer/src/utils/udpDeviceDiscovery";
+import {
+  connectToHost,
+  getTCPState,
+  sendFiles,
+  startHost,
+} from "../renderer/src/utils/tcpServer";
 
 let mainWindow: BrowserWindow | null = null;
 let maximizeToggle = false;
@@ -72,32 +76,23 @@ ipcMain.handle("get-files", async (_, drive) => {
   return await getFiles(drive);
 });
 
-let discoveredDevices: { address: string; name: string }[] = [];
-
-ipcMain.handle("start-device-discovery", async (_, username) => {
-  startTCPServer();
-
-  startDeviceDiscovery((devicesList) => {
-    discoveredDevices = devicesList;
-  }, username);
-
-  return "Discovery started";
+ipcMain.on("start-host", async (event, port) => {
+  await startHost(port);
+  event.reply("host-started", getTCPState());
 });
 
-ipcMain.handle("found-devices", () => {
-  return discoveredDevices;
+ipcMain.on("connect-to-host", async (event, hostIP, port) => {
+  await connectToHost(hostIP, port);
+  event.reply("host-connected", getTCPState());
 });
 
-ipcMain.handle("select-file", async () => {
-  const result = await dialog.showOpenDialog({ properties: ["openFile"] });
+ipcMain.on("send-files", async (event, filePaths) => {
+  await sendFiles(filePaths);
+  event.reply("files-sent", getTCPState());
+});
 
-  if (!result.canceled && result.filePaths.length > 0) {
-    return {
-      name: result.filePaths[0].split("/").pop() || "unknown",
-      path: result.filePaths[0],
-    };
-  }
-  return null;
+ipcMain.handle("get-tcp-state", async () => {
+  return getTCPState();
 });
 
 app.whenReady().then(() => {

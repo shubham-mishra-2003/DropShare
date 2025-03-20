@@ -14,12 +14,11 @@ function App(): JSX.Element {
           <Route path="/" element={<Home />} />
           <Route path="/settings" element={<Settings />} />
           <Route path="/sharing" element={<Sharing />} />
-          {/* <Route path="/files/:drive/*" element={<FileExplorer />} /> */}
           <Route path="*" element={<NotFound />} />
         </Routes>
       </div>
     </Router>
-  )
+  );
 }
 
-export default App
+export default App;

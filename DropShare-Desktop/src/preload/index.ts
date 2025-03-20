@@ -1,23 +1,11 @@
 import { contextBridge, ipcRenderer } from "electron";
 import { electronAPI } from "@electron-toolkit/preload";
-import path from "path";
 
 const api = {
-  joinPath: (...args: string[]) => path.join(...args),
   handleMinimize: () => ipcRenderer.send("minimize"),
   handleMaximize: () => ipcRenderer.send("maximize"),
   handleClose: () => ipcRenderer.send("close"),
-  openFilePicker: () => ipcRenderer.invoke("open-file-picker"),
-  startDiscovery: (username: string) => ipcRenderer.invoke("start-device-discovery", username),
-  // onDeviceFound: (callback) => {
-  //   ipcRenderer.on("device-discovered", (_, devicesList) => {
-  //     console.log("Devices in Renderer:", devicesList);
-  //     callback(devicesList);
-  //   });
-  // },
-  getFoundDevices: () => ipcRenderer.invoke("found-devices"),
   getDrives: () => ipcRenderer.invoke("get-drives"),
-  selectFile: () => ipcRenderer.invoke("select-file"),
   getFiles: (drive: string) => ipcRenderer.invoke("get-files", drive),
 };
 
@@ -26,6 +14,20 @@ if (process.contextIsolated) {
     contextBridge.exposeInMainWorld("electron", {
       ...electronAPI,
       ...api,
+    });
+    contextBridge.exposeInMainWorld("tcp", {
+      startHost: (port: number) => ipcRenderer.send("start-host", port),
+      connectToHost: (hostIP: string, port: number) =>
+        ipcRenderer.send("connect-to-host", hostIP, port),
+      sendFiles: (filePaths: string[]) =>
+        ipcRenderer.send("send-files", filePaths),
+      getTCPState: () => ipcRenderer.invoke("get-tcp-state"),
+      onHostStarted: (callback: Function) =>
+        ipcRenderer.on("host-started", (_event, data) => callback(data)),
+      onHostConnected: (callback: Function) =>
+        ipcRenderer.on("host-connected", (_event, data) => callback(data)),
+      onFilesSent: (callback: Function) =>
+        ipcRenderer.on("files-sent", (_event, data) => callback(data)),
     });
   } catch (error) {
     console.error("Error exposing API:", error);
