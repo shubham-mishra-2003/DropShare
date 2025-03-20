@@ -23,6 +23,7 @@ import QRScanner from "../components/Sharing/QrScanner";
 import { useTCP } from "../service/TCPProvider";
 import dgram from "react-native-udp";
 import useUsername from "../hooks/useUsername";
+import { connectAndSendFile, discoverServer } from "../service/client-side";
 
 const ClientScreen: FC = () => {
   const [isScanner, setIsScanner] = useState(false);
@@ -110,28 +111,42 @@ const ClientScreen: FC = () => {
     });
   };
 
-  useEffect(() => {
-    if (isConnected) {
-      navigate("connection");
-    }
-  }, [isConnected]);
+  // useEffect(() => {
+  //   if (isConnected) {
+  //     navigate("connection");
+  //   }
+  // }, [isConnected]);
+
+  // useEffect(() => {
+  //   let udpServer: any;
+  //   const setUpServer = async () => {
+  //     udpServer = await listenForDevices();
+  //   };
+  //   setUpServer();
+
+  //   return () => {
+  //     if (udpServer) {
+  //       udpServer.close(() => {
+  //         console.log("UDP server closed");
+  //       });
+  //     }
+  //     setNearbyDevices([]);
+  //   };
+  // }, []);
 
   useEffect(() => {
-    let udpServer: any;
-    const setUpServer = async () => {
-      udpServer = await listenForDevices();
-    };
-    setUpServer();
-
-    return () => {
-      if (udpServer) {
-        udpServer.close(() => {
-          console.log("UDP server closed");
-        });
-      }
-      setNearbyDevices([]);
-    };
-  }, []);
+    discoverServer()
+      .then((serverIP) => {
+        console.log('Discovered Server IP:', serverIP);
+        return connectAndSendFile('/path/to/image.jpg');
+      })
+      .then(() => {
+        console.log('File transfer complete!');
+      })
+      .catch((error) => {
+        console.error('Error:', error);
+      });
+  })
 
   return (
     <SafeAreaView style={styles.container}>

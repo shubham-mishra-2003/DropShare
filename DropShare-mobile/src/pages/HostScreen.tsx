@@ -27,6 +27,7 @@ import {
 } from "../utils/networkUtils";
 import { Toast } from "../components/Toasts";
 import dgram from "react-native-udp";
+import { startTCPServer, startUDPServerDiscovery } from "../service/server-side";
 
 const HostScreen: FC = () => {
   const [qrValue, setQrValue] = useState("Shubham");
@@ -107,7 +108,9 @@ const HostScreen: FC = () => {
   };
 
   useEffect(() => {
-    startupServer();
+    // startupServer();
+    startUDPServerDiscovery();
+    startTCPServer();
   }, []);
 
   useEffect(() => {

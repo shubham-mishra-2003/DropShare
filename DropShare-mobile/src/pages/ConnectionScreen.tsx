@@ -130,7 +130,7 @@ const ConnectionScreen: FC = () => {
             </Text>
           ))} */}
 
-          <Text
+          {connectedDevices && <Text
             style={{
               color: Colors[colorScheme].tint,
               fontSize: 15,
@@ -138,7 +138,7 @@ const ConnectionScreen: FC = () => {
             }}
           >
             {connectedDevices.deviceName} {connectedDevices.ip}
-          </Text>
+          </Text>}
         </View>
         <View style={styles.fileContainer}>
           <View style={styles.sendReceiveContainer}>
