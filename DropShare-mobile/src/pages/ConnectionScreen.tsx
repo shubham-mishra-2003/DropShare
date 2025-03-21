@@ -118,17 +118,17 @@ const ConnectionScreen: FC = () => {
             Connected With :
           </Text>
           {/* {connectedDevices.map((device, index) => (
-            <Text
-              key={index}
-              style={{
-                color: Colors[colorScheme].tint,
-                fontSize: 15,
-                fontWeight: "bold",
-              }}
-            >
-              {device.name} ({device.ip})
-            </Text>
-          ))} */}
+              <Text
+                key={index}
+                style={{
+                  color: Colors[colorScheme].tint,
+                  fontSize: 15,
+                  fontWeight: "bold",
+                }}
+              >
+                {device.name} ({device.ip})
+              </Text>
+            ))} */}
 
           <Text
             style={{

@@ -162,6 +162,12 @@ const HomeContent: React.FC = () => {
         </View>
       </ScrollView>
       <DropshareConnect />
+      <TouchableOpacity onPress={() => navigate("testhost")}>
+        <Text>Test Host</Text>
+      </TouchableOpacity>
+      <TouchableOpacity onPress={() => navigate("testclient")}>
+        <Text>Test Host</Text>
+      </TouchableOpacity>
     </View>
   );
 };

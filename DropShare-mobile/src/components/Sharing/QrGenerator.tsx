@@ -30,7 +30,7 @@ const QRGenerator: React.FC<QRGeneratorProps> = ({ visible, setVisible }) => {
     if (!server) {
       startServer(port);
     }
-    setQrValue(`tcp://${ip}:${port}|${deviceName}`);
+    setQrValue(`dropshare://${ip}:${port}|${deviceName}`);
     console.log(`Server started: ${ip}:${port}`);
     setLoading(false);
   };

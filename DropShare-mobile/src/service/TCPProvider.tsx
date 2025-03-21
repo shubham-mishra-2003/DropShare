@@ -271,55 +271,56 @@ export const TCPProvider: FC<{ children: React.ReactNode }> = ({
   );
 
   const sendFilesAck = async (file: any, type: "image" | "file") => {
-    if (currentChunkSet != null) {
-      Alert.alert("Wait for the current file to be sent");
-      return;
-    }
-    const normalizedPath =
-      Platform.OS === "ios" ? file?.uri?.replace("file://", "") : file?.uri;
-    const fileData = await RNFS.readFile(normalizedPath, "base64");
-    const buffer = Buffer.from(fileData, "base64");
-    const ChunkSize = 1024 * 8;
-
-    let totalChunks = 0;
-    let ofRNFSet = 0;
-    let chunkArray = [];
-
-    while (ofRNFSet < buffer.length) {
-      const chunk = buffer.slice(ofRNFSet, ofRNFSet + ChunkSize);
-      totalChunks += 1;
-      chunkArray.push(chunk);
-      ofRNFSet += chunk.length;
-    }
-
-    const rawData = {
-      id: uuidv4(),
-      name: type === "file" ? file?.name : file?.fileName,
-      size: type === "file" ? file?.size : file?.fileSize,
-      mimeType: type === "file" ? "file" : ".jpg",
-      totalChunks,
-    };
-
-    setCurrentChunkSet({
-      id: rawData?.id,
-      chunkArray,
-      totalChunks,
-    });
-
-    setSentFiles((prevData: any) =>
-      produce(prevData, (draft: any) => {
-        draft.push({ ...rawData, uri: file?.uri });
-      })
-    );
-
-    const socket = client || serverSocket;
-    if (!socket) return;
-
     try {
-      console.log("File acknowledge done");
+      if (currentChunkSet != null) {
+        Alert.alert("Wait for the current file to be sent");
+        return;
+      }
+      const normalizedPath =
+        Platform.OS === "ios" ? file?.uri?.replace("file://", "") : file?.uri;
+      const fileData = await RNFS.readFile(normalizedPath, "base64");
+      const buffer = Buffer.from(fileData, "base64");
+      const ChunkSize = 1024 * 8;
+
+      let totalChunks = 0;
+      let ofRNFSet = 0;
+      let chunkArray = [];
+
+      while (ofRNFSet < buffer.length) {
+        const chunk = buffer.slice(ofRNFSet, ofRNFSet + ChunkSize);
+        totalChunks += 1;
+        chunkArray.push(chunk);
+        ofRNFSet += chunk.length;
+      }
+
+      const rawData = {
+        id: uuidv4(),
+        name: type === "file" ? file?.name : file?.fileName,
+        size: type === "file" ? file?.size : file?.fileSize,
+        mimeType: type === "file" ? "file" : ".jpg",
+        totalChunks,
+      };
+
+      setCurrentChunkSet({
+        id: rawData?.id,
+        chunkArray,
+        totalChunks,
+      });
+
+      setSentFiles((prevData: any) =>
+        produce(prevData, (draft: any) => {
+          draft.push({ ...rawData, uri: file?.uri });
+        })
+      );
+
+      const socket = client || serverSocket;
+      if (!socket) return;
+
       socket.write(JSON.stringify({ event: "file_ack", file: rawData }));
+
+      console.log("sent data: ", rawData);
     } catch (error) {
-      console.log("Error sending...", error);
+      console.log("Error at sendFileAck");
     }
   };
 

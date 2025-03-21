@@ -50,7 +50,7 @@ const ClientScreen: FC = () => {
       position = { x, y };
       isOverlapping = existingPositions.some((pos) => {
         const dx = pos.x - position.x;
-        const dy = pos.y = position.y;
+        const dy = (pos.y = position.y);
         return Math.sqrt(dx * dx + dy * dy) < minDistance;
       });
     } while (isOverlapping);
@@ -103,7 +103,7 @@ const ClientScreen: FC = () => {
             useNativeDriver: true,
           }).start();
 
-          return [...prevDevices || [], newDevice];
+          return [...(prevDevices || []), newDevice];
         }
         return prevDevices;
       });

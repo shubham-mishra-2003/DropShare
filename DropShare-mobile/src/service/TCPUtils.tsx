@@ -11,14 +11,16 @@ export const receiveFileAck = async (
 ) => {
   const { setChunkStore, chunkStore } = useChunkStore.getState();
   if (chunkStore) {
-    Alert.alert("Ongoing file transfer wait for one to be ended");
+    Alert.alert("Ongoing file transfer, wait for one to be ended");
     return;
   }
+
   setReceivedFiles((prevData: any) =>
     produce(prevData, (draft: any) => {
       draft.push(data);
     })
   );
+
   setChunkStore({
     id: data?.id,
     totalChunks: data?.totalChunks,
@@ -34,17 +36,16 @@ export const receiveFileAck = async (
   }
 
   try {
-    await new Promise((resolve) => setTimeout(resolve, 10));
-    console.log("File received");
+    await new Promise<void>((resolve) => setTimeout(() => resolve(), 10));
+    console.log("File received, requesting first chunk...");
     socket.write(JSON.stringify({ event: "send_chunk_ack", chunkNo: 0 }));
-    console.log("Requsted for first chunk");
   } catch (error) {
-    console.error("Error sending file: ", error);
+    console.error("Error requesting first chunk: ", error);
   }
 };
 
 export const sendChunkAck = async (
-  chunkIndex: any,
+  chunkIndex: number,
   socket: any,
   setSentFiles: any,
   setTotalSentBytes: any
@@ -63,23 +64,25 @@ export const sendChunkAck = async (
   const totalChunks = currentChunkSet?.totalChunks;
 
   try {
-    await new Promise((resolve) => setTimeout(resolve, 10));
+    await new Promise<void>((resolve) => setTimeout(() => resolve(), 10));
+
     socket.write(
       JSON.stringify({
         event: "receive_chunk_ack",
-        chunk: currentChunkSet?.chunkArray[chunkIndex].toString("base64"),
+        chunk: currentChunkSet.chunkArray[chunkIndex]?.toString("base64"),
         chunkNo: chunkIndex,
       })
     );
+
     setTotalSentBytes(
       (prev: number) => prev + currentChunkSet.chunkArray[chunkIndex]?.length
     );
 
-    if (chunkIndex + 2 > totalChunks) {
+    if (chunkIndex + 1 >= totalChunks) {
       console.log("All chunks sent successfully");
       setSentFiles((prevFiles: any) =>
         produce(prevFiles, (draftFiles: any) => {
-          const fileIndex = draftFiles?.fileIndex(
+          const fileIndex = draftFiles.findIndex(
             (f: any) => f.id === currentChunkSet.id
           );
           if (fileIndex !== -1) {
@@ -87,17 +90,16 @@ export const sendChunkAck = async (
           }
         })
       );
-
       resetCurrentChunkSet();
     }
   } catch (error) {
-    Toast(`Error file sending: ${error}`);
+    Toast(`Error sending chunk: ${error}`);
   }
 };
 
 export const receiveChunkAck = async (
-  chunk: any,
-  chunkNo: any,
+  chunk: string,
+  chunkNo: number,
   socket: any,
   setTotalReceivedBytes: any,
   generateFile: any
@@ -106,15 +108,16 @@ export const receiveChunkAck = async (
     useChunkStore.getState();
 
   if (!chunkStore) {
-    console.log("Chunks tore is full");
+    console.log("Chunk store is full");
     return;
   }
 
   try {
     const bufferChunk = Buffer.from(chunk, "base64");
-    const updateChunkArray = [...(chunkStore.chunksArray || [])];
-    updateChunkArray[chunkNo] = bufferChunk;
-    setChunkStore({ ...chunkStore, chunkArray: updateChunkArray });
+    const updatedChunkArray = [...(chunkStore.chunkArray || [])];
+    updatedChunkArray[chunkNo] = bufferChunk;
+
+    setChunkStore({ ...chunkStore, chunkArray: updatedChunkArray });
     setTotalReceivedBytes(
       (prevValue: number) => prevValue + bufferChunk.length
     );
@@ -123,24 +126,24 @@ export const receiveChunkAck = async (
   }
 
   if (!socket) {
-    console.log("Spocket not available");
+    console.log("Socket not available");
     return;
   }
 
-  if (chunkNo + 1 === chunkStore?.totalChunks) {
-    console.log("All chunks received");
+  if (chunkNo + 1 === chunkStore.totalChunks) {
+    console.log("All chunks received, generating file...");
     generateFile();
     resetChunkStore();
     return;
   }
 
   try {
-    await new Promise((resolve) => setTimeout(resolve, 10));
-    console.log("Requested for next chunk", chunkNo + 1);
+    await new Promise<void>((resolve) => setTimeout(() => resolve(), 10));
+    console.log("Requesting next chunk", chunkNo + 1);
     socket.write(
       JSON.stringify({ event: "send_chunk_ack", chunkNo: chunkNo + 1 })
     );
   } catch (error) {
-    Toast(`Error file sending: ${error}`);
+    Toast(`Error requesting next chunk: ${error}`);
   }
 };

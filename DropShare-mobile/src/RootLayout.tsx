@@ -3,35 +3,26 @@ import { NavigationContainer } from "@react-navigation/native";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import { enableScreens } from "react-native-screens";
 import { navigationRef } from "./utils/NavigationUtil";
-import SettingsPage from "./pages/SettingPage";
-import {
-  Animated,
-  Linking,
-  PermissionsAndroid,
-  Platform,
-  StatusBar,
-  Text,
-  TouchableOpacity,
-  View,
-} from "react-native";
+import { Animated, StatusBar } from "react-native";
 import Sidebar from "./components/Sidebar";
 import { logoHeadStyles } from "./constants/Styles";
 import { useTheme } from "./hooks/ThemeProvider";
 import { screenWidth } from "./utils/Constants";
 import { Colors } from "./constants/Colors";
-import Home from "./pages/HomePage";
 
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import FileViewer from "./components/FileManager/FileViewer";
 import FilesList from "./components/FileManager/FilesList";
 import StorageList from "./components/FileManager/StorageList";
-import ConnectionScreen from "./pages/ConnectionScreen";
 
 import { TCPProvider } from "./service/TCPProvider";
 import ReceivedFile from "./components/FileManager/ReceivedFile";
+import ConnectionScreen from "./pages/ConnectionScreen";
 import HostScreen from "./pages/HostScreen";
 import ClientScreen from "./pages/ClientScreen";
+import SettingsPage from "./pages/SettingsPage";
+import Home from "./pages/HomePage";
 
 enableScreens();
 

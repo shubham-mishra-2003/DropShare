@@ -6,7 +6,6 @@ import { Colors } from "../constants/Colors";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import HomeContent from "../components/HomeContent";
-import LinearGradient from "react-native-linear-gradient";
 
 interface homeProps {
   toggleSidebar: () => void;
