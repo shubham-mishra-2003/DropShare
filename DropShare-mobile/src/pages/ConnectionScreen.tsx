@@ -1,15 +1,13 @@
+// ConnectionScreen.tsx
+import React, { FC, useState } from "react";
 import {
   View,
-  Text,
-  StyleSheet,
   TouchableOpacity,
-  StatusBar,
-  ScrollView,
+  FlatList,
   Image,
+  ProgressBarAndroid,
+  Platform,
 } from "react-native";
-import React, { FC, useEffect, useState } from "react";
-import { useTCP } from "../service/TCPProvider";
-import { resetAndNavigate } from "../utils/NavigationUtil";
 import { useTheme } from "../hooks/ThemeProvider";
 import { Colors } from "../constants/Colors";
 import Icon from "../components/Icon";
@@ -18,420 +16,295 @@ import MediaPicker from "../components/MediaPicker";
 import { formatFileSize } from "../utils/FileSystemUtil";
 import BreakerText from "../components/ui/BreakerText";
 import RNFS from "react-native-fs";
+import { Buffer } from "buffer";
+import { resetAndNavigate } from "../utils/NavigationUtil";
+import { useNetwork } from "../service/NetworkProvider";
+import { connectionStyles } from "../constants/Styles";
+import StyledText from "../components/ui/StyledText";
+import LinearGradient from "react-native-linear-gradient";
+import DropShareModal from "../components/ui/Modal";
+import MessageView from "../components/MessageView";
 
 const ConnectionScreen: FC = () => {
   const { colorScheme } = useTheme();
-  const [fileSelectorOpen, setFileSelectorOpen] = useState(false);
   const styles = connectionStyles(colorScheme);
   const {
-    connectedDevices,
-    disconnect,
-    sendFilesAck,
-    sentFiles,
+    devices,
+    messages,
     receivedFiles,
-    totalReceivedBytes,
-    totalSentBytes,
+    sentFiles,
+    sendMessage,
+    sendFile,
+    disconnect,
     isConnected,
-  } = useTCP();
+    isHost,
+  } = useNetwork();
 
+  const [fileSelectorOpen, setFileSelectorOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<"Sent" | "Received">("Sent");
-  const [selectToSend, setSelectToSend] = useState<any>();
+  const [selectToSend, setSelectToSend] = useState<RNFS.ReadDirItem[]>([]);
+  const [messageView, setMessageView] = useState(false);
+  const [transferProgress, setTransferProgress] = useState<{
+    progress: string;
+    speed: string;
+    percentage: number;
+  }>({ progress: "0/0 bytes", speed: "0 KB/s", percentage: 0 });
 
-  const handleSend = async () => {
-    if (!selectToSend) {
-      console.warn("No file selected");
-      return;
-    }
+  // const handleSendFile = async () => {
+  //   if (!selectToSend.length) return;
+  //   try {
+  //     for (const file of selectToSend) {
+  //       const fileData = await RNFS.readFile(file.path, "base64");
+  //       const buffer = Buffer.from(fileData, "base64");
+  //       await sendFile(file.path, buffer, setTransferProgress);
+  //     }
+  //     setSelectToSend([]);
+  //     setTransferProgress({
+  //       progress: "0/0 bytes",
+  //       speed: "0 KB/s",
+  //       percentage: 0,
+  //     });
+  //   } catch (error) {
+  //     console.error("Error sending files:", error);
+  //   }
+  // };
 
-    console.log("Reading file:", selectToSend.path);
-
-    try {
-      const fileData = await RNFS.readFile(selectToSend.path, "base64");
-      console.log("File Read Successfully:", selectToSend.name);
-      console.log("File Path:", selectToSend.path);
-      console.log(
-        "Encoded file data (First 500 chars):",
-        fileData.substring(0, 500)
-      );
-      sendFilesAck(
-        {
-          name: selectToSend.name,
-          path: selectToSend.path,
-          data: fileData,
-        },
-        "image"
-      );
-    } catch (error) {
-      console.error("Error reading file:", error);
-    }
+  const handleSendMessage = () => {
+    sendMessage(`Hello from ${isHost ? "Host" : "Client"}`);
   };
 
-  useEffect(() => {
-    if (!isConnected) {
-      resetAndNavigate("home");
-    }
-  }, [isConnected]);
+  const handleDisconnect = () => {
+    disconnect();
+    resetAndNavigate("home");
+  };
 
   return (
-    <View style={styles.main}>
-      <View style={styles.container}>
-        <View style={styles.header}>
-          <TouchableOpacity
-            style={styles.headerButton}
-            onPress={() => resetAndNavigate("home")}
-          >
-            <Icon source={icons.back} filter={1} height={20} width={20} />
-          </TouchableOpacity>
-          <View
-            style={{
-              flexDirection: "row",
-              gap: 5,
-              alignItems: "center",
-              justifyContent: "center",
-            }}
-          >
-            <Icon source={images.logo} height={40} width={40} filter={0} />
-            <Text style={{ color: Colors[colorScheme].text }}>DropShare</Text>
-          </View>
-          <TouchableOpacity
-            style={styles.headerButton}
-            onPress={() => disconnect()}
-          >
-            <Icon source={icons.disConnect} filter={1} height={20} width={25} />
-          </TouchableOpacity>
-        </View>
-        <View
-          style={{
-            gap: 5,
-            justifyContent: "center",
-            flexDirection: "row",
-            marginBottom: 20,
-          }}
+    <LinearGradient
+      start={{ x: 0, y: 0 }}
+      end={{ x: 1, y: 1 }}
+      colors={Colors[colorScheme].linearGradientColors}
+      style={styles.main}
+    >
+      {/* Header */}
+      <View style={styles.header}>
+        <TouchableOpacity
+          style={styles.headerButton}
+          onPress={handleDisconnect}
         >
-          <Text
-            style={{
-              color: Colors[colorScheme].text,
-              fontSize: 15,
-              fontWeight: "bold",
-            }}
-          >
-            Connected With :
-          </Text>
-          {/* {connectedDevices.map((device, index) => (
-              <Text
-                key={index}
-                style={{
-                  color: Colors[colorScheme].tint,
-                  fontSize: 15,
-                  fontWeight: "bold",
-                }}
-              >
-                {device.name} ({device.ip})
-              </Text>
-            ))} */}
-
-          <Text
-            style={{
-              color: Colors[colorScheme].tint,
-              fontSize: 15,
-              fontWeight: "bold",
-            }}
-          >
-            {connectedDevices.deviceName} {connectedDevices.ip}
-          </Text>
+          <Icon source={icons.back} filter={1} height={20} width={20} />
+        </TouchableOpacity>
+        <View style={{ flexDirection: "row", gap: 5, alignItems: "center" }}>
+          <Icon source={images.logo} height={40} width={40} filter={0} />
+          <StyledText fontSize={24} fontWeight="bold" text="DropShare" />
         </View>
-        <View style={styles.fileContainer}>
-          <View style={styles.sendReceiveContainer}>
-            <View style={styles.selectedFileButtonContainer}>
-              <TouchableOpacity
-                onPress={() => setActiveTab("Sent")}
-                style={[
-                  styles.sendReceiveButton,
-                  {
-                    backgroundColor:
-                      activeTab == "Sent"
-                        ? Colors[colorScheme].tint
-                        : Colors[colorScheme].background,
-                  },
-                ]}
-              >
-                <Icon source={icons.sent} height={25} width={25} filter={1} />
-                <Text style={{ color: Colors[colorScheme].text }}>Sent</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                onPress={() => setActiveTab("Received")}
-                style={[
-                  styles.sendReceiveButton,
-                  {
-                    backgroundColor:
-                      activeTab == "Received"
-                        ? Colors[colorScheme].tint
-                        : Colors[colorScheme].background,
-                  },
-                ]}
-              >
-                <Icon
-                  source={icons.received}
-                  height={25}
-                  width={25}
-                  filter={1}
-                />
-                <Text style={{ color: Colors[colorScheme].text }}>
-                  Received
-                </Text>
-              </TouchableOpacity>
-            </View>
+        <TouchableOpacity
+          style={styles.headerButton}
+          onPress={handleDisconnect}
+        >
+          <Icon source={icons.disConnect} filter={1} height={20} width={25} />
+        </TouchableOpacity>
+      </View>
+
+      {/* Devices Section */}
+      <View style={{ padding: 15, gap: 10 }}>
+        <StyledText
+          fontSize={22}
+          fontWeight="bold"
+          text={isHost ? "Connected Clients" : "Connected Host"}
+        />
+        <FlatList
+          data={devices}
+          keyExtractor={(item) => item.ip}
+          renderItem={({ item }) => (
             <View
               style={{
                 flexDirection: "row",
-                gap: 3,
-                justifyContent: "flex-end",
-                paddingHorizontal: 20,
+                justifyContent: "space-between",
+                alignItems: "center",
+                padding: 10,
+                backgroundColor: Colors[colorScheme].itemBackground,
+                borderRadius: 10,
               }}
             >
-              <Text style={{ color: Colors[colorScheme].text, fontSize: 12 }}>
-                {formatFileSize(
-                  activeTab === "Sent" ? totalSentBytes : totalReceivedBytes
-                ) || 0}
-              </Text>
-
-              <Text style={{ color: Colors[colorScheme].text, fontSize: 12 }}>
-                /
-              </Text>
-
-              <Text style={{ color: Colors[colorScheme].text, fontSize: 12 }}>
-                {activeTab == "Sent"
-                  ? formatFileSize(
-                      sentFiles?.reduce(
-                        (total: number, file: any) => total + file.size,
-                        0
-                      )
-                    )
-                  : formatFileSize(
-                      receivedFiles?.reduce(
-                        (total: number, file: any) => total + file.size,
-                        0
-                      )
-                    )}
-              </Text>
-            </View>
-          </View>
-
-          <BreakerText
-            text={activeTab == "Sent" ? "Sent files" : "Received files"}
-          />
-
-          {(activeTab === "Sent" ? sentFiles?.length : receivedFiles?.length) >
-          0 ? (
-            <ScrollView contentContainerStyle={styles.fileList}>
-              {(activeTab == "Sent" ? sentFiles : receivedFiles).map(
-                (item: any) => (
-                  <View style={styles.fileItem} key={item.id}>
-                    <Text style={{ color: Colors[colorScheme].text }}>
-                      {item.name}
-                    </Text>
-                    <Text style={{ color: Colors[colorScheme].text }}>
-                      {formatFileSize(item.size)}
-                    </Text>
-                  </View>
-                )
-              )}
-            </ScrollView>
-          ) : (
-            <View style={styles.noDataContainer}>
-              <Text style={{ color: Colors[colorScheme].text, marginTop: 10 }}>
-                {activeTab === "Sent"
-                  ? "No files sent yet"
-                  : "No files received yet"}
-              </Text>
-            </View>
-          )}
-        </View>
-        <View style={styles.selectedFileContainer}>
-          <BreakerText text="selected files" />
-          {selectToSend ? (
-            <ScrollView contentContainerStyle={styles.fileList}>
-              <View style={styles.selectedFileItem}>
-                <View
-                  style={{
-                    flexDirection: "row",
-                    justifyContent: "center",
-                    alignItems: "center",
-                    gap: 5,
+              <StyledText fontSize={18}>
+                {item.name} ({item.ip})
+              </StyledText>
+              {isHost && (
+                <TouchableOpacity
+                  onPress={() => {
+                    /* TODO: removeClient */
                   }}
                 >
-                  <Image
-                    src={`file://${selectToSend?.path}`}
-                    height={40}
-                    width={40}
-                    resizeMode="cover"
+                  <Icon
+                    source={icons.cross}
+                    filter={1}
+                    height={20}
+                    width={20}
                   />
-                  <Text style={{ color: Colors[colorScheme].text }}>
-                    {selectToSend?.name}
-                  </Text>
-                </View>
-                <Text style={{ color: Colors[colorScheme].text }}>
-                  {formatFileSize(selectToSend?.size)}
-                </Text>
-              </View>
-            </ScrollView>
-          ) : (
-            <View style={{ flex: 1, alignItems: "center" }}>
-              <Text
-                style={{
-                  color: Colors[colorScheme].text,
-                  textAlign: "center",
-                  marginTop: 10,
-                }}
-              >
-                No files Selected
-              </Text>
+                </TouchableOpacity>
+              )}
             </View>
           )}
-          <TouchableOpacity
-            onPress={() => handleSend()}
-            style={{
-              backgroundColor: Colors[colorScheme].tint,
-              padding: 10,
-              borderRadius: 20,
-              width: "70%",
-            }}
-          >
-            <Text
-              style={{
-                color: Colors[colorScheme].text,
-                textAlign: "center",
-                fontSize: 18,
-              }}
-            >
-              Send
-            </Text>
-          </TouchableOpacity>
-        </View>
+        />
       </View>
-      <View style={{ justifyContent: "center", alignItems: "center" }}>
-        <TouchableOpacity
+
+      {/* Transfer Progress */}
+      {transferProgress.percentage > 0 && (
+        <View
           style={{
-            backgroundColor: Colors[colorScheme].tint,
-            paddingVertical: 10,
-            paddingHorizontal: 30,
-            borderRadius: 20,
+            padding: 15,
+            backgroundColor: Colors[colorScheme].itemBackground,
+            borderRadius: 10,
+            marginHorizontal: 15,
           }}
-          onPress={() => setFileSelectorOpen(true)}
         >
-          <Text style={{ fontSize: 18, color: Colors[colorScheme].text }}>
-            Select Files
-          </Text>
+          <StyledText
+            fontSize={16}
+            fontWeight="bold"
+            text="Transfer Progress"
+          />
+          <StyledText
+            text={`${transferProgress.progress} (${transferProgress.speed})`}
+          />
+          {/* {Platform.OS === "android" ? (
+            <ProgressBarAndroid
+              styleAttr="Horizontal"
+              indeterminate={false}
+              progress={transferProgress.percentage / 100}
+              color={Colors[colorScheme].tint}
+            />
+          ) : (
+            <ProgressViewIOS
+              progress={transferProgress.percentage / 100}
+              progressTintColor={Colors[colorScheme].tint}
+            />
+          )} */}
+        </View>
+      )}
+
+      {/* Files Section */}
+      <FlatList
+        data={[
+          { key: "tabs" },
+          {
+            key: "files",
+            data: activeTab === "Sent" ? sentFiles : receivedFiles,
+          },
+        ]}
+        renderItem={({ item }) => {
+          if (item.key === "tabs") {
+            return (
+              <View style={styles.sendReceiveContainer}>
+                <TouchableOpacity
+                  onPress={() => setActiveTab("Sent")}
+                  style={[
+                    styles.sendReceiveButton,
+                    {
+                      backgroundColor:
+                        activeTab === "Sent"
+                          ? Colors[colorScheme].tint
+                          : Colors[colorScheme].background,
+                    },
+                  ]}
+                >
+                  <Icon source={icons.sent} height={25} width={25} filter={1} />
+                  <StyledText text="Sent" fontSize={18} fontWeight="bold" />
+                </TouchableOpacity>
+                <TouchableOpacity
+                  onPress={() => setActiveTab("Received")}
+                  style={[
+                    styles.sendReceiveButton,
+                    {
+                      backgroundColor:
+                        activeTab === "Received"
+                          ? Colors[colorScheme].tint
+                          : Colors[colorScheme].background,
+                    },
+                  ]}
+                >
+                  <Icon
+                    source={icons.received}
+                    height={25}
+                    width={25}
+                    filter={1}
+                  />
+                  <StyledText text="Received" fontSize={18} fontWeight="bold" />
+                </TouchableOpacity>
+              </View>
+            );
+          }
+          return (
+            <View style={styles.fileContainer}>
+              <BreakerText text={`${activeTab} Files`} />
+              {/* {item.data.length > 0 ? (
+                <FlatList
+                  data={item.data}
+                  keyExtractor={(file) => file.id || file}
+                  renderItem={({ item: file }) => (
+                    <View style={styles.fileItem}>
+                      <StyledText
+                        text={file.name || file.split("/").pop()}
+                        fontSize={16}
+                      />
+                      <StyledText
+                        text={formatFileSize(file.size || RNFS.stat(file).size)}
+                        fontSize={16}
+                      />
+                    </View>
+                  )}
+                />
+              ) : (
+                <StyledText
+                  text={`No files ${activeTab.toLowerCase()} yet`}
+                  fontSize={18}
+                  style={{ textAlign: "center" }}
+                />
+              )} */}
+            </View>
+          );
+        }}
+      />
+
+      {/* Action Buttons */}
+      <View
+        style={{
+          flexDirection: "row",
+          justifyContent: "space-around",
+          padding: 15,
+        }}
+      >
+        {selectToSend.length > 0 && (
+          <TouchableOpacity>
+            <StyledText text="Send" fontSize={20} fontWeight="bold" />
+          </TouchableOpacity>
+        )}
+        <TouchableOpacity onPress={() => setFileSelectorOpen(true)}>
+          <StyledText text="Select Files" fontSize={20} fontWeight="bold" />
         </TouchableOpacity>
       </View>
+
+      {/* Message Button */}
+      <TouchableOpacity
+        style={styles.messageButton}
+        onPress={() => setMessageView(true)}
+      >
+        <Icon source={icons.message} filter={1} height={30} width={30} />
+      </TouchableOpacity>
+
       <MediaPicker
         selectToSend={selectToSend}
         setSelectToSend={setSelectToSend}
         visible={fileSelectorOpen}
         setVisible={() => setFileSelectorOpen(false)}
       />
-      <StatusBar
-        backgroundColor={Colors[colorScheme].background}
-        barStyle="default"
-      />
-    </View>
+      <DropShareModal
+        visible={messageView}
+        onRequestClose={() => setMessageView(false)}
+      >
+        <MessageView setMessageView={setMessageView} />
+      </DropShareModal>
+    </LinearGradient>
   );
 };
 
 export default ConnectionScreen;
-
-const connectionStyles = (colorScheme: "dark" | "light") =>
-  StyleSheet.create({
-    main: {
-      flex: 1,
-      backgroundColor: Colors[colorScheme].background,
-      justifyContent: "space-between",
-      paddingHorizontal: 10,
-      paddingBottom: 20,
-    },
-    header: {
-      flexDirection: "row",
-      justifyContent: "space-between",
-      alignItems: "center",
-      paddingVertical: 10,
-    },
-    container: {
-      gap: 10,
-    },
-    connectionContainer: {
-      flexDirection: "row",
-      alignItems: "center",
-      justifyContent: "center",
-      padding: 10,
-    },
-    sendReceiveButton: {
-      width: "50%",
-      borderRadius: 20,
-      padding: 10,
-      gap: 10,
-      flexDirection: "row",
-      alignItems: "center",
-      justifyContent: "center",
-    },
-    headerButton: {
-      justifyContent: "center",
-      alignItems: "center",
-      height: 40,
-      width: 40,
-      borderRadius: 50,
-      backgroundColor: Colors[colorScheme].itemBackground,
-    },
-    fileContainer: {
-      backgroundColor: Colors[colorScheme].itemBackground,
-      borderRadius: 20,
-      padding: 10,
-      height: 320,
-      justifyContent: "center",
-      alignItems: "center",
-    },
-    sendReceiveContainer: {},
-    fileList: {
-      gap: 10,
-      paddingVertical: 10,
-      alignItems: "center",
-    },
-    noDataContainer: {
-      flex: 1,
-      alignItems: "center",
-    },
-    fileItem: {
-      alignItems: "center",
-      flexDirection: "row",
-      padding: 20,
-      gap: 10,
-      justifyContent: "space-between",
-      backgroundColor: Colors[colorScheme].background,
-      borderRadius: 15,
-      width: "100%",
-    },
-    selectedFileContainer: {
-      backgroundColor: Colors[colorScheme].itemBackground,
-      borderRadius: 20,
-      padding: 10,
-      height: 250,
-      justifyContent: "center",
-      alignItems: "center",
-    },
-    selectedFileItem: {
-      alignItems: "center",
-      flexDirection: "row",
-      padding: 12,
-      gap: 10,
-      justifyContent: "space-between",
-      backgroundColor: Colors[colorScheme].background,
-      borderRadius: 15,
-      width: "100%",
-    },
-    selectedFileButtonContainer: {
-      flexDirection: "row",
-      alignItems: "center",
-      padding: 10,
-      justifyContent: "center",
-      gap: 10,
-    },
-  });

@@ -2,7 +2,6 @@ import {
   ActivityIndicator,
   Image,
   ScrollView,
-  StyleSheet,
   Text,
   TouchableOpacity,
   View,
@@ -11,15 +10,16 @@ import React, { useEffect, useState } from "react";
 import RNFS from "react-native-fs";
 import { Colors } from "../../constants/Colors";
 import { useTheme } from "../../hooks/ThemeProvider";
-import Header from "../Header";
+import Header from "../ui/Header";
 import { goBack, navigate } from "../../utils/NavigationUtil";
 import useSelectFile from "../../hooks/useSelectFile";
 import { FilesStyles } from "../../constants/Styles";
 import { formatFileSize } from "../../utils/FileSystemUtil";
 import { Toast } from "../Toasts";
+import LinearGradient from "react-native-linear-gradient";
 
 const ReceivedFile = () => {
-  const path = `${RNFS.ExternalStorageDirectoryPath}/Android/media/com.Dropshare/received`;
+  const path = `${RNFS.ExternalStorageDirectoryPath}/Dropshare`;
   const [receivedFiles, setReceivedFiles] = useState<RNFS.ReadDirItem[]>([]);
   const { colorScheme } = useTheme();
   const [loading, setLoading] = useState(true);
@@ -46,7 +46,10 @@ const ReceivedFile = () => {
   const { selectedFiles, setSelectedFiles } = useSelectFile();
 
   return (
-    <View
+    <LinearGradient
+      start={{ x: 0, y: 0 }}
+      end={{ x: 1, y: 1 }}
+      colors={Colors[colorScheme].linearGradientColors}
       style={{
         flex: 1,
         backgroundColor: Colors[colorScheme].background,
@@ -108,7 +111,7 @@ const ReceivedFile = () => {
           )}
         </ScrollView>
       )}
-    </View>
+    </LinearGradient>
   );
 };
 

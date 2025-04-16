@@ -1,4 +1,4 @@
-import { View, Text, ActivityIndicator, TouchableOpacity } from "react-native";
+import { View, ActivityIndicator, TouchableOpacity } from "react-native";
 import React, { useEffect, useMemo, useState } from "react";
 import { useTheme } from "../../hooks/ThemeProvider";
 import { Colors } from "../../constants/Colors";
@@ -12,24 +12,22 @@ import { icons } from "../../assets";
 import BottomSheet from "../ui/BottomSheet";
 import BreakerText from "../ui/BreakerText";
 import { navigate } from "../../utils/NavigationUtil";
-import { useTCP } from "../../service/TCPProvider";
+import StyledText from "../ui/StyledText";
+import { useNetwork } from "../../service/NetworkProvider";
 
 interface QRScannerProps {
   visible: boolean;
   setVisible: (visible: boolean) => void;
 }
 
-const QRScanner: React.FC<QRScannerProps> = ({
-  visible = false,
-  setVisible,
-}) => {
+const QRScanner: React.FC<QRScannerProps> = ({ visible, setVisible }) => {
   const [codeFound, setCodeFound] = useState(false);
   const { colorScheme } = useTheme();
   const [loading, setLoading] = useState(true);
   const [hasPermission, setHasPermission] = useState(false);
   const device = useCameraDevice("back");
 
-  const { connectToServer, isConnected } = useTCP();
+  const { startClient, connectToHostIp, isConnected } = useNetwork();
 
   useEffect(() => {
     const checkPermission = async () => {
@@ -37,12 +35,15 @@ const QRScanner: React.FC<QRScannerProps> = ({
       setHasPermission(camerPermission === "granted");
     };
     checkPermission().then(() => setLoading(false));
+    if (!loading && visible) {
+      startClient();
+    }
   }, [visible]);
 
   const handleScan = (data: any) => {
-    const [connectionData, deviceName] = data.replace("dropshare://", "").split("|");
+    const [connectionData] = data.replace("dropshare://", "").split("|");
     const [host, port] = connectionData?.split(":");
-    connectToServer(host, parseInt(port, 10), deviceName);
+    connectToHostIp(host);
   };
 
   const codeScanner = useMemo<CodeScanner>(
@@ -74,7 +75,7 @@ const QRScanner: React.FC<QRScannerProps> = ({
     <BottomSheet
       visible={visible}
       onRequestClose={() => setVisible(false)}
-      height={680}
+      height={700}
     >
       <View
         style={{
@@ -92,15 +93,15 @@ const QRScanner: React.FC<QRScannerProps> = ({
             style={{ justifyContent: "center", alignItems: "center", gap: 20 }}
           >
             <Icon source={icons.cameraOff} height={80} width={80} filter={1} />
-            <Text
+            <StyledText
+              fontWeight="bold"
               style={{
                 fontSize: 20,
                 color: Colors[colorScheme].text,
                 textAlign: "center",
               }}
-            >
-              Camera not found or permission not granted
-            </Text>
+              text="Camera not found or permission not granted"
+            />
           </View>
         ) : (
           <>
@@ -110,30 +111,29 @@ const QRScanner: React.FC<QRScannerProps> = ({
               style={{ width: "100%", height: 400 }}
               codeScanner={codeScanner}
             />
-            <Text
+            <StyledText
+              fontWeight="bold"
               style={{
+                fontSize: 20,
                 color: Colors[colorScheme].text,
-                fontSize: 16,
                 textAlign: "center",
               }}
-            >
-              Ensure you are in same wifi network
-            </Text>
-            <Text
+              text="Ensure you are in same wifi network"
+            />
+            <StyledText
+              fontWeight="bold"
               style={{
-                color: Colors[colorScheme].text,
                 fontSize: 22,
+                color: Colors[colorScheme].text,
                 textAlign: "center",
               }}
-            >
-              Ask the device to show their QR to establish connection
-            </Text>
+              text="Ask the device to show their QR to establish connection"
+            />
           </>
         )}
       </View>
       <View
         style={{
-          gap: 10,
           width: "100%",
           justifyContent: "center",
           alignItems: "center",
@@ -158,9 +158,11 @@ const QRScanner: React.FC<QRScannerProps> = ({
             boxShadow: `0px 0px 20px ${Colors[colorScheme].tint}`,
           }}
         >
-          <Text style={{ fontSize: 20, color: Colors[colorScheme].text }}>
-            Search by network
-          </Text>
+          <StyledText
+            fontWeight="bold"
+            fontSize={20}
+            text="Search by network"
+          />
         </TouchableOpacity>
       </View>
     </BottomSheet>

@@ -11,7 +11,7 @@ import React, { useEffect, useState } from "react";
 import RNFS from "react-native-fs";
 import { Colors } from "../../constants/Colors";
 import { useTheme } from "../../hooks/ThemeProvider";
-import Header from "../Header";
+import Header from "../ui/Header";
 import { goBack, navigate } from "../../utils/NavigationUtil";
 import useSelectFile from "../../hooks/useSelectFile";
 import { FilesStyles } from "../../constants/Styles";

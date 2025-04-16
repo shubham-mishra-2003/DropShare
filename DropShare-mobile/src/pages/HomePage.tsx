@@ -1,10 +1,9 @@
 import React from "react";
 import { StyleSheet } from "react-native";
-import Header from "../components/Header";
+import Header from "../components/ui/Header";
 import { useTheme } from "../hooks/ThemeProvider";
 import { Colors } from "../constants/Colors";
 import { SafeAreaView } from "react-native-safe-area-context";
-
 import HomeContent from "../components/HomeContent";
 
 interface homeProps {

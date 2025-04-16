@@ -5,7 +5,6 @@ import RNFS from "react-native-fs";
 import { Colors } from "../constants/Colors";
 import { useTheme } from "../hooks/ThemeProvider";
 import { useRoute } from "@react-navigation/native";
-import { Device } from "../utils/networkUtils";
 
 const TCP_PORT = 6000;
 
@@ -18,7 +17,7 @@ const FileSharingScreen: React.FC = () => {
 
   useEffect(() => {
     selectedDevices.forEach((device) => {
-      sendFile(device.address);
+      // sendFile(device.address);
     });
   }, []);
 
@@ -48,11 +47,11 @@ const FileSharingScreen: React.FC = () => {
   return (
     <View style={styles.main}>
       <Text style={styles.title}>Sharing Files...</Text>
-      {selectedDevices.map((device) => (
+      {/* {selectedDevices.map((device) => (
         <View key={device.address} style={styles.deviceContainer}>
           <Text style={styles.name}>{device.name}</Text>
         </View>
-      ))}
+      ))} */}
     </View>
   );
 };

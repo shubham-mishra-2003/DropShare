@@ -1,6 +1,4 @@
 import RNFS from "react-native-fs";
-import { PermissionsAndroid, Platform } from "react-native";
-import { Toast } from "../components/Toasts";
 
 export interface StorageInfo {
   used: number;
@@ -31,79 +29,6 @@ export const getStorageInfo = async (): Promise<StorageInfo> => {
   } catch (error) {
     console.error("Error fetching storage info:", error);
     return { used: 0, total: 0 };
-  }
-};
-
-export const requestStoragePermission = async (): Promise<boolean> => {
-  try {
-    let granted = false;
-    if (Platform.OS === "android") {
-      if (Number(Platform.Version) >= 33) {
-        const imagePermission = await PermissionsAndroid.request(
-          PermissionsAndroid.PERMISSIONS.READ_MEDIA_IMAGES,
-          {
-            title: "Image Access Required",
-            message: "We need your permissions to serve you",
-            buttonPositive: "Allow",
-            buttonNegative: "Deny",
-          }
-        );
-        const videoPermission = await PermissionsAndroid.request(
-          PermissionsAndroid.PERMISSIONS.READ_MEDIA_VIDEO,
-          {
-            title: "Video Access Required",
-            message: "We need your permissions to serve you",
-            buttonPositive: "Allow",
-            buttonNegative: "Deny",
-          }
-        );
-        const audioPermission = await PermissionsAndroid.request(
-          PermissionsAndroid.PERMISSIONS.READ_MEDIA_AUDIO,
-          {
-            title: "Audio Access Required",
-            message: "We need your permissions to serve you",
-            buttonPositive: "Allow",
-            buttonNegative: "Deny",
-          }
-        );
-        granted =
-          imagePermission === PermissionsAndroid.RESULTS.GRANTED &&
-          videoPermission === PermissionsAndroid.RESULTS.GRANTED &&
-          audioPermission === PermissionsAndroid.RESULTS.GRANTED;
-      } else {
-        const storageReadPermissions = await PermissionsAndroid.request(
-          PermissionsAndroid.PERMISSIONS.READ_EXTERNAL_STORAGE,
-          {
-            title: "Files Read Access Required",
-            message: "We need your permissions to serve you",
-            buttonPositive: "Allow",
-            buttonNegative: "Deny",
-          }
-        );
-        const storageWritePermissions = await PermissionsAndroid.request(
-          PermissionsAndroid.PERMISSIONS.READ_EXTERNAL_STORAGE,
-          {
-            title: "Write Files Access Required",
-            message: "We need your permissions to serve you",
-            buttonPositive: "Allow",
-            buttonNegative: "Deny",
-          }
-        );
-        granted =
-          storageReadPermissions === PermissionsAndroid.RESULTS.GRANTED &&
-          storageWritePermissions === PermissionsAndroid.RESULTS.GRANTED;
-      }
-      if (!granted) {
-        Toast("Permission denied.");
-      }
-      return granted;
-    }
-    return false;
-  } catch (err) {
-    Toast(
-      "Failed to request storage permission. Please grant permission from settings."
-    );
-    return false;
   }
 };
 
@@ -180,7 +105,7 @@ export const getFileCounts = async (
     };
 
     for (const file of files) {
-      if (!file || !file.name) continue;
+      if (!file || !file.name || file.name.startsWith(".")) continue;
 
       if (file.isFile()) {
         if (/\.(jpg|png|jpeg|gif|webp)$/i.test(file.name)) counts.Photos++;
@@ -212,10 +137,150 @@ export const getFileCounts = async (
   }
 };
 
-export const formatFileSize = (size: number): string => {
-  if (size < 1024) return `${size} B`;
-  if (size < 1024 * 1024) return `${(size / 1024).toFixed(2)} KB`;
-  if (size < 1024 * 1024 * 1024)
-    return `${(size / (1024 * 1024)).toFixed(2)} MB`;
-  return `${(size / (1024 * 1024 * 1024)).toFixed(2)} GB`;
+export const fileType = (file: RNFS.ReadDirItem) => {
+  if (!file) return null;
+  const fileExtension = file.name.split(".").pop()?.toLowerCase();
+  const isImage = ["jpg", "jpeg", "png", "gif", "bmp", "webp"].includes(
+    fileExtension || ""
+  );
+  const isPdf = fileExtension === "pdf";
+  const isVideo = ["mp4", "mov", "avi", "mkv", "webm"].includes(
+    fileExtension || ""
+  );
+  const isAudio = ["mp3", "wav", "aac", "ogg", "m4a"].includes(
+    fileExtension || ""
+  );
+
+  let fileType = "";
+
+  if (isImage) {
+    fileType = "image";
+  } else if (isVideo) {
+    fileType = "video";
+  } else if (isAudio) {
+    fileType = "audio";
+  } else if (isPdf) {
+    fileType = "pdf";
+  } else {
+    fileType = "";
+  }
+
+  return fileType;
+};
+
+interface ReadDirItem extends RNFS.ReadDirItem {
+  path: string;
+  name: string;
+  isDirectory: () => boolean;
+  isFile: () => boolean;
+}
+
+export interface ConstantProps {
+  filePath?: string;
+  selectedFiles: ReadDirItem[];
+}
+
+export const fileOperations = () => {
+  const handleMove = async ({ filePath, selectedFiles }: ConstantProps) => {
+    if (!filePath) throw new Error("filePath is required for move operation");
+    try {
+      await Promise.all(
+        selectedFiles.map(async (file) => {
+          const destPath = `${filePath}/${file.name}`;
+          await RNFS.moveFile(file.path, destPath);
+          console.log(`File moved to: ${destPath}`);
+        })
+      );
+    } catch (error) {
+      console.error("Error moving files:", error);
+      throw error;
+    }
+  };
+
+  const handleCopy = async ({ filePath, selectedFiles }: ConstantProps) => {
+    if (!filePath) throw new Error("filePath is required for copy operation");
+    try {
+      await Promise.all(
+        selectedFiles.map(async (file) => {
+          const destPath = `${filePath}/${file.name}`;
+          await RNFS.copyFile(file.path, destPath);
+          console.log(`File copied to: ${destPath}`);
+        })
+      );
+    } catch (error) {
+      console.error("Error copying files:", error);
+      throw error;
+    }
+  };
+
+  const handleMoveToSafe = async ({ selectedFiles }: ConstantProps) => {
+    try {
+      const safePath = `${RNFS.DocumentDirectoryPath}/Safe/`;
+      const safeDirectoryExists = await RNFS.exists(safePath);
+      if (!safeDirectoryExists) {
+        await RNFS.mkdir(safePath);
+      }
+
+      await Promise.all(
+        selectedFiles.map(async (file) => {
+          const destPath = `${safePath}${file.name}`;
+          await RNFS.moveFile(file.path, destPath);
+          console.log(`File moved to safe location: ${destPath}`);
+        })
+      );
+    } catch (error) {
+      console.error("Error moving files to safe:", error);
+      throw error;
+    }
+  };
+
+  const handleDelete = async ({ selectedFiles }: ConstantProps) => {
+    try {
+      await Promise.all(
+        selectedFiles.map(async (file) => {
+          await RNFS.unlink(file.path);
+          console.log(`File deleted: ${file.path}`);
+        })
+      );
+    } catch (error) {
+      console.error("Error deleting files:", error);
+      throw error;
+    }
+  };
+
+  const handleInfo = async ({ selectedFiles }: ConstantProps) => {
+    try {
+      const fileInfos = await Promise.all(
+        selectedFiles.map(async (file) => {
+          const stats = await RNFS.stat(file.path);
+          return { name: file.name, stats };
+        })
+      );
+      console.log("File Info:", fileInfos);
+      return fileInfos;
+    } catch (error) {
+      console.error("Error retrieving files info:", error);
+      throw error;
+    }
+  };
+
+  return {
+    handleMove,
+    handleCopy,
+    handleDelete,
+    handleMoveToSafe,
+    handleInfo,
+  };
+};
+
+export const formatFileSize = (sizeInBytes: number): string => {
+  if (sizeInBytes >= 1024 ** 3) {
+    return (sizeInBytes / 1024 ** 3).toFixed(2) + " GB";
+  } else if (sizeInBytes >= 1024 ** 2) {
+    return (sizeInBytes / 1024 ** 2).toFixed(2) + " MB";
+  } else if (sizeInBytes >= 1024) {
+    return (sizeInBytes / 1024).toFixed(2) + " KB";
+  } else {
+    return sizeInBytes + " B";
+  }
 };

@@ -15,11 +15,17 @@ module.exports = (async () => {
       babelTransformerPath: require.resolve("react-native-svg-transformer"),
     },
     resolver: {
-      assetExts: [...assetExts.filter((ext) => ext !== "svg"), "pem", "p12"],
+      assetExts: [
+        ...assetExts.filter((ext) => ext !== "svg"),
+        "pem",
+        "p12",
+        "onnx",
+        "txt",
+      ], // Add onnx and txt
       sourceExts: [...sourceExts, "svg"],
       extraNodeModules: {
-        crypto: require.resolve("react-native-crypto"),
         buffer: require.resolve("buffer"),
+        stream: require.resolve("react-native-stream"),
       },
     },
   };

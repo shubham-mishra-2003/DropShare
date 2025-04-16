@@ -11,7 +11,8 @@ import { getStorageInfo, getFileCounts } from "../utils/FileSystemUtil";
 import SearchComponent from "./SearchInput";
 import DropShareModal from "./ui/Modal";
 import DropshareConnect from "./Sharing/DropshareConnect";
-import { startIndexing } from "../db/dropshareDb";
+import LinearGradient from "react-native-linear-gradient";
+import StyledText from "./ui/StyledText";
 
 interface FileCounts {
   [key: string]: number;
@@ -62,7 +63,6 @@ const HomeContent: React.FC = () => {
   useFocusEffect(
     useCallback(() => {
       fetchData();
-      startIndexing();
     }, [])
   );
 
@@ -78,12 +78,33 @@ const HomeContent: React.FC = () => {
   const [search, setSearch] = useState(false);
 
   return (
-    <View style={styles.mainView} key={Number(refresh)}>
+    <LinearGradient
+      start={{ x: 0, y: 0 }}
+      end={{ x: 1, y: 1 }}
+      colors={Colors[colorScheme].linearGradientColors}
+      style={styles.mainView}
+    >
       <ScrollView
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ padding: 10, gap: 15 }}
+        contentContainerStyle={{ paddingHorizontal: 12, gap: 15 }}
       >
-        <Text style={styles.heading}>Files</Text>
+        <TouchableOpacity onPress={() => navigate("testhost")}>
+          <StyledText fontSize={20} fontWeight="bold">
+            Test Host
+          </StyledText>
+        </TouchableOpacity>
+        <TouchableOpacity onPress={() => navigate("testclient")}>
+          <StyledText fontSize={20} fontWeight="bold">
+            Test client
+          </StyledText>
+        </TouchableOpacity>
+        <TouchableOpacity onPress={() => navigate("hostConnection")}>
+          <StyledText fontSize={25}>Host connection</StyledText>
+        </TouchableOpacity>
+        <TouchableOpacity onPress={() => navigate("clientConnection")}>
+          <StyledText fontSize={25}>Client connection</StyledText>
+        </TouchableOpacity>
+        <StyledText text="Files" fontWeight="bold" fontSize={55} />
         <TouchableOpacity
           onPress={() => setSearch(true)}
           style={{
@@ -96,7 +117,11 @@ const HomeContent: React.FC = () => {
           }}
         >
           <Icon source={icons.search} height={20} width={20} filter={0.7} />
-          <Text style={styles.input}>Search files or folders</Text>
+          <StyledText
+            fontWeight="bold"
+            style={styles.input}
+            text="Search files or folders"
+          />
         </TouchableOpacity>
         <DropShareModal
           visible={search}
@@ -108,12 +133,14 @@ const HomeContent: React.FC = () => {
           onPress={() => navigate("storage")}
           style={styles.card}
         >
-          <Text style={styles.cardText}>Device storage</Text>
+          <StyledText fontSize={25} text="Device Storage" fontWeight="bold" />
           <View style={styles.storageInfo}>
-            <Text style={styles.remainingStorage}>
+            <StyledText fontWeight="bold" fontSize={22}>
               {storage.used} GB |{" "}
-              <Text style={styles.totalStorage}>{storage.total} GB</Text>
-            </Text>
+              <StyledText fontWeight="bold" fontSize={26}>
+                {storage.total} GB
+              </StyledText>
+            </StyledText>
             <View style={styles.Bar}>
               <View
                 style={{
@@ -124,51 +151,51 @@ const HomeContent: React.FC = () => {
                 }}
               />
             </View>
-            <Text style={{ color: Colors[colorScheme].text, fontSize: 20 }}>
-              Free: {storage.free.toFixed(2)} GB
-            </Text>
+            <StyledText
+              fontWeight="bold"
+              fontSize={22}
+              style={{ color: Colors[colorScheme].text }}
+            >
+              Free : {storage.free.toFixed(2)} GB
+            </StyledText>
           </View>
         </TouchableOpacity>
         <TouchableOpacity
           onPress={() => navigate("received")}
           style={{
-            backgroundColor: Colors[colorScheme].itemBackground,
+            backgroundColor: Colors[colorScheme].transparent,
             padding: 20,
             borderRadius: 20,
           }}
         >
-          <Text
-            style={{
-              color: Colors[colorScheme].text,
-              fontSize: 20,
-              textAlign: "center",
-            }}
+          <StyledText
+            fontWeight="bold"
+            style={{ textAlign: "center" }}
+            fontSize={24}
           >
             Received
-          </Text>
+          </StyledText>
         </TouchableOpacity>
         <View style={styles.categoriesContainer}>
           {categories.map((item) => (
             <TouchableOpacity
               key={item.name}
               style={styles.categoryCard}
-              onPress={() => navigate("fileslist", { category: item.name })}
+              onPress={() =>
+                navigate("fileslist", {
+                  params: { category: item.name },
+                })
+              }
             >
-              <Text style={styles.categoryText}>{item.name}</Text>
+              <StyledText text={item.name} fontWeight="bold" />
               <Icon source={item.icon} height={20} width={20} filter={1} />
-              <Text style={styles.categoryText}>{fileCounts[item.name]}</Text>
+              <StyledText fontWeight="bold">{fileCounts[item.name]}</StyledText>
             </TouchableOpacity>
           ))}
         </View>
       </ScrollView>
       <DropshareConnect />
-      <TouchableOpacity onPress={() => navigate("testhost")}>
-        <Text>Test Host</Text>
-      </TouchableOpacity>
-      <TouchableOpacity onPress={() => navigate("testclient")}>
-        <Text>Test Host</Text>
-      </TouchableOpacity>
-    </View>
+    </LinearGradient>
   );
 };
 

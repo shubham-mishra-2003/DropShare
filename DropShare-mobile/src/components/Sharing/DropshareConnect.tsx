@@ -1,11 +1,4 @@
-import {
-  ActivityIndicator,
-  Image,
-  ScrollView,
-  Text,
-  TouchableOpacity,
-  View,
-} from "react-native";
+import { Image, Text, TouchableOpacity, View } from "react-native";
 import React, { useState } from "react";
 
 import useUsername from "../../hooks/useUsername";
@@ -18,6 +11,7 @@ import { Colors } from "../../constants/Colors";
 import { navigate } from "../../utils/NavigationUtil";
 import QRGenerator from "./QrGenerator";
 import QRScanner from "./QrScanner";
+import StyledText from "../ui/StyledText";
 
 const DropshareConnect = () => {
   const [openConnect, setOpenConnect] = useState(false);
@@ -36,7 +30,9 @@ const DropshareConnect = () => {
         style={styles.shareButton}
       >
         <Icon source={icons.share} height={25} width={25} filter={1} />
-        <Text style={styles.shareText}>Share</Text>
+        <StyledText fontWeight="bold" style={styles.shareText}>
+          Share
+        </StyledText>
       </TouchableOpacity>
       <BottomSheet
         visible={openConnect}
@@ -52,23 +48,25 @@ const DropshareConnect = () => {
             width={100}
             style={styles.logo}
           />
-          <Text style={styles.username}>Display name: {username}</Text>
+          <StyledText fontWeight="bold" style={styles.username}>
+            Display name: {username}
+          </StyledText>
           <TouchableOpacity
             onPress={() => {
               setOpenConnect(false);
               navigate("setting");
             }}
           >
-            <Text
+            <StyledText
+              fontWeight="bold"
               style={{
                 color: Colors[colorScheme].tint,
                 textDecorationLine: "underline",
-                fontSize: 18,
+                fontSize: 20,
                 textAlign: "center",
               }}
-            >
-              Change display name
-            </Text>
+              text="Change display name"
+            />
           </TouchableOpacity>
           <View
             style={{
@@ -86,22 +84,22 @@ const DropshareConnect = () => {
                 borderRadius: 20,
                 height: 50,
                 justifyContent: "center",
+                alignItems: "center",
               }}
               onPress={() => {
                 setOpenHostSheet(true);
                 setOpenConnect(false);
               }}
             >
-              <Text
+              <StyledText
+                fontWeight="bold"
                 style={{
                   color: "#00aff0",
-                  fontSize: 16,
                   textAlign: "center",
-                  fontWeight: "bold",
                 }}
-              >
-                Host connection
-              </Text>
+                fontSize={22}
+                text="Host connection"
+              />
             </TouchableOpacity>
             <TouchableOpacity
               onPress={() => {
@@ -116,16 +114,15 @@ const DropshareConnect = () => {
                 justifyContent: "center",
               }}
             >
-              <Text
+              <StyledText
+                fontWeight="bold"
                 style={{
                   color: Colors[colorScheme].tint,
-                  fontSize: 16,
+                  fontSize: 24,
                   textAlign: "center",
-                  fontWeight: "bold",
                 }}
-              >
-                Connect
-              </Text>
+                text="Connect"
+              />
             </TouchableOpacity>
           </View>
         </View>

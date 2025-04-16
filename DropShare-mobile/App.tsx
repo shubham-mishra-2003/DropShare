@@ -1,6 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
 import {
-  Animated,
   BackHandler,
   Linking,
   Text,
@@ -9,27 +8,17 @@ import {
 } from "react-native";
 import { Toast } from "./src/components/Toasts";
 import { ThemeProvider } from "./src/hooks/ThemeProvider";
-import { splashScreenStyles } from "./src/constants/Styles";
-import { images } from "./src/assets";
 import RootLayout from "./src/RootLayout";
-import { requestStoragePermission } from "./src/utils/FileSystemUtil";
+import SplashScreen from "./src/components/SplashScreen";
+import {
+  requestPermissions,
+  verifyAllFilesAccess,
+} from "./src/utils/permissionRequests";
+import { startIndexing } from "./src/db/dropshareDb";
+import useSettingsButton from "./src/hooks/useSettingsButton";
 
 export default function App() {
-  const [isSplashVisible, setIsSplashVisible] = useState(true);
-  const scaleAnim = useRef(new Animated.Value(0.5)).current;
   const [permissioned, setPermissioned] = useState(false);
-
-  useEffect(() => {
-    Animated.timing(scaleAnim, {
-      toValue: 1,
-      duration: 1000,
-      useNativeDriver: true,
-    }).start(() => {
-      setTimeout(() => {
-        setIsSplashVisible(false);
-      }, 500);
-    });
-  }, [scaleAnim, setIsSplashVisible]);
 
   const backPressCount = useRef(0);
   useEffect(() => {
@@ -55,24 +44,24 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    requestStoragePermission().then(() => setPermissioned(true));
+    requestPermissions();
+    verifyAllFilesAccess().then(() => setPermissioned(true));
   }, []);
+
+  const { settings } = useSettingsButton();
+
+  // useEffect(() => {
+  //   if (permissioned) {
+  //     startIndexing(settings.enableSmartSearch);
+  //   }
+  // }, [permissioned, settings.enableSmartSearch]);
+
+  const [isSplashVisible, setIsSplashVisible] = useState(true);
 
   return (
     <ThemeProvider>
       {isSplashVisible ? (
-        <View style={splashScreenStyles.splashContainer}>
-          <Animated.Image
-            source={images.logo}
-            style={[
-              splashScreenStyles.logo,
-              { transform: [{ scale: scaleAnim }] },
-            ]}
-          />
-          <Text style={splashScreenStyles.splashText}>
-            Welcome to DropShare
-          </Text>
-        </View>
+        <SplashScreen setIsSplashVisible={setIsSplashVisible} />
       ) : permissioned ? (
         <RootLayout />
       ) : (

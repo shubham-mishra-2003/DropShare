@@ -1,13 +1,12 @@
 import { StyleSheet } from "react-native";
 import { Colors } from "./Colors";
-import { screenWidth } from "../utils/Constants";
+import { screenHeight, screenWidth } from "../utils/Constants";
 
 export const splashScreenStyles = StyleSheet.create({
   splashContainer: {
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
-    backgroundColor: Colors.dark.background,
   },
   logo: {
     width: 250,
@@ -15,9 +14,6 @@ export const splashScreenStyles = StyleSheet.create({
   },
   splashText: {
     marginTop: 20,
-    fontSize: 24,
-    fontWeight: "bold",
-    color: "#FFF",
   },
 });
 
@@ -25,14 +21,17 @@ export const headerStyles = (colorScheme: "light" | "dark") =>
   StyleSheet.create({
     header: {
       paddingHorizontal: 2,
-      backgroundColor: Colors[colorScheme].itemBackground,
+      backgroundColor: Colors[colorScheme].background,
       flexDirection: "row",
       justifyContent: "space-between",
       alignItems: "center",
       minHeight: 60,
-      width: '100%'
+      width: "100%",
     },
     iconContainer: {
+      position: "absolute",
+      left: 5,
+      zIndex: 10,
       padding: 10,
       borderRadius: 10,
       justifyContent: "center",
@@ -42,36 +41,31 @@ export const headerStyles = (colorScheme: "light" | "dark") =>
       flexDirection: "row",
       alignItems: "center",
       justifyContent: "center",
-      gap: 10,
       flex: 1,
-      overflow: 'hidden'
+      overflow: "hidden",
+      gap: 5,
     },
     image: {
       height: 50,
       width: 50,
     },
-    headText: {
-      fontSize: 20,
+    logoName: {
+      fontSize: 24,
       color: Colors[colorScheme].text,
     },
     optionsContainer: {
-      position: 'absolute',
+      position: "absolute",
       top: 50,
       right: 10,
       backgroundColor: Colors[colorScheme].background,
       padding: 10,
       gap: 10,
-      borderRadius: 20
+      borderRadius: 20,
     },
     options: {
       backgroundColor: Colors[colorScheme].itemBackground,
       padding: 15,
-      borderRadius: 20
-    },
-    text: {
-      color: "#fff",
-      fontSize: 16,
-      paddingHorizontal: 10
+      borderRadius: 20,
     },
   });
 
@@ -89,10 +83,6 @@ export const filesStyle = (colorScheme: "light" | "dark") =>
       flex: 1,
       justifyContent: "space-between",
     },
-    heading: {
-      fontSize: 40,
-      color: Colors[colorScheme].text,
-    },
     inputView: {
       flexDirection: "row",
       backgroundColor: Colors[colorScheme].itemBackground,
@@ -103,67 +93,49 @@ export const filesStyle = (colorScheme: "light" | "dark") =>
       height: 45,
     },
     input: {
-      color: Colors[colorScheme].text,
-      fontWeight: "bold",
       flex: 1,
-      fontSize: 17,
-      textAlignVertical: 'bottom',
-      height: '100%'
+      fontSize: 20,
+      textAlignVertical: "bottom",
+      height: "100%",
     },
     card: {
       padding: 20,
       backgroundColor: Colors[colorScheme].transparent,
       borderRadius: 20,
       justifyContent: "space-between",
-      gap: 20
-    },
-    cardText: {
-      color: Colors[colorScheme].text,
-      fontSize: 25,
+      gap: 15,
     },
     storageInfo: {
       gap: 10,
-    },
-    remainingStorage: {
-      color: Colors[colorScheme].text,
-      fontSize: 20,
     },
     divider: {
       margin: 10,
       width: 2,
       backgroundColor: Colors[colorScheme].text,
     },
-    totalStorage: {
-      fontSize: 28,
-      color: Colors[colorScheme].text,
-    },
     Bar: {
-      backgroundColor: Colors[colorScheme].background,
+      backgroundColor: Colors[colorScheme].itemBackground,
       height: 26,
       borderRadius: 50,
-      overflow: 'hidden'
+      overflow: "hidden",
     },
     categoriesContainer: {
       flex: 1,
       gap: 10,
       flexDirection: "row",
       flexWrap: "wrap",
-      justifyContent: 'center',
-      alignItems: 'center'
+      justifyContent: "center",
+      alignItems: "center",
     },
     categoryCard: {
-      height: screenWidth / 3.4,
-      width: screenWidth / 3.4,
+      height: screenWidth / 3.5,
+      width: screenWidth / 3.5,
       borderRadius: 15,
-      backgroundColor: Colors[colorScheme].itemBackground,
+      backgroundColor: Colors[colorScheme].transparent,
       justifyContent: "space-between",
       padding: 10,
       alignItems: "center",
       flexDirection: "column",
-    },
-    categoryText: {
-      fontSize: 12,
-      color: Colors[colorScheme].text,
     },
   });
 
@@ -199,6 +171,7 @@ export const ModeSwitchStyles = (colorScheme: "light" | "dark") =>
       borderColor: Colors[colorScheme].border,
       position: "absolute",
       right: 5,
+      zIndex: 1000,
     },
     image: {
       filter: colorScheme === "dark" ? "invert(1)" : "invert(0)",
@@ -211,25 +184,20 @@ export const ModeSwitchStyles = (colorScheme: "light" | "dark") =>
       borderWidth: 1,
       borderColor: Colors[colorScheme].border,
       position: "absolute",
-      top: 45,
-      right: 0,
+      top: 50,
+      right: 5,
       zIndex: 100,
       elevation: 100,
-      padding: 4,
-      gap: 5,
+      padding: 5,
     },
     option: {
       flexDirection: "row",
       alignItems: "center",
       justifyContent: "space-between",
-      gap: 15,
+      gap: 20,
       padding: 7,
       paddingHorizontal: 10,
       borderRadius: 10,
-    },
-    optionText: {
-      fontSize: 16,
-      color: Colors[colorScheme].text,
     },
   });
 
@@ -302,14 +270,11 @@ export const sidebarStyles = (colorScheme: "light" | "dark") =>
       top: 0,
       left: 0,
       height: "100%",
-      width: "80%",
-      backgroundColor: Colors[colorScheme].transparent,
+      backgroundColor: Colors[colorScheme].background,
       justifyContent: "center",
       zIndex: 100,
       borderTopEndRadius: 20,
       borderEndEndRadius: 20,
-      paddingBottom: 15,
-      paddingTop: 7,
     },
     overlay: {
       position: "absolute",
@@ -325,10 +290,7 @@ export const sidebarStyles = (colorScheme: "light" | "dark") =>
       gap: 10,
       padding: 10,
       flexDirection: "row",
-    },
-    logoText: {
-      fontSize: 15,
-      color: Colors[colorScheme].text,
+      justifyContent: "center",
     },
     optionsContainer: {
       gap: 20,
@@ -342,15 +304,12 @@ export const sidebarStyles = (colorScheme: "light" | "dark") =>
       gap: 20,
       flexDirection: "row",
       alignItems: "center",
-      backgroundColor: Colors[colorScheme].background,
+      backgroundColor: Colors[colorScheme].transparent,
       width: "100%",
-      padding: 12,
-      borderRadius: 10,
-    },
-    optionsText: {
-      fontFamily: "sans-serif",
-      fontSize: 15,
-      color: Colors[colorScheme].text,
+      padding: 20,
+      borderRadius: 32,
+      borderWidth: 1,
+      borderColor: Colors[colorScheme].tint,
     },
     footer: {
       flexDirection: "row",
@@ -361,10 +320,6 @@ export const sidebarStyles = (colorScheme: "light" | "dark") =>
     footerButton: {
       justifyContent: "center",
       alignItems: "center",
-    },
-    footerText: {
-      color: Colors[colorScheme].text,
-      fontSize: 13,
     },
     dot: {
       height: 10,
@@ -396,14 +351,14 @@ export const FilesListStyles = (colorScheme: "light" | "dark") =>
     },
     modal: {
       flex: 1,
-      justifyContent: 'center',
-      alignItems: 'center'
+      justifyContent: "center",
+      alignItems: "center",
     },
     editContainer: {
-      backgroundColor: Colors[colorScheme].transparent,
-      padding: 20,
-      borderRadius: 20,
-      gap: 20,
+      backgroundColor: Colors[colorScheme].itemBackground,
+      padding: 15,
+      borderRadius: 30,
+      gap: 10,
       width: "80%",
       justifyContent: "space-between",
       borderWidth: 2,
@@ -416,175 +371,413 @@ export const FilesListStyles = (colorScheme: "light" | "dark") =>
       fontSize: 20,
       borderBottomWidth: 2,
       borderColor: Colors[colorScheme].text,
-      borderRadius: 10,
-      padding: 15,
+      borderRadius: 25,
+      padding: 20,
       borderWidth: 1,
     },
     buttonContainer: {
       flexDirection: "row",
-      gap: 20,
+      gap: 10,
       alignItems: "center",
       justifyContent: "flex-end",
     },
     modalbutton: {
       color: Colors[colorScheme].text,
+      backgroundColor: Colors[colorScheme].tint,
+      paddingHorizontal: 20,
+      paddingVertical: 10,
+      borderRadius: 20,
+      textAlign: "center",
+    },
+  });
+
+export const FilesStyles = (colorScheme: "light" | "dark") =>
+  StyleSheet.create({
+    container: { flex: 1, backgroundColor: Colors[colorScheme].background },
+    scrollContainer: {
+      flexGrow: 1,
+    },
+    filesView: {
+      flexDirection: "row",
+      flexWrap: "wrap",
+      gap: 10,
+      padding: 10,
+    },
+    fileItem: {
+      width: screenWidth / 3.4,
+      height: screenWidth / 3.4,
+      alignItems: "center",
+      justifyContent: "center",
+      borderRadius: 7,
+      backgroundColor: Colors[colorScheme].itemBackground,
+      gap: 5,
+      position: "relative",
+    },
+    image: {
+      width: "100%",
+      height: "100%",
+      resizeMode: "cover",
+      borderRadius: 7,
+    },
+    textView: {
+      position: "absolute",
+      top: 0,
+      right: 0,
+      bottom: 0,
+      left: 0,
+      backgroundColor: "rgba(30, 41, 59, 0.6)",
+      padding: 5,
+    },
+    text: {
+      fontSize: 13,
+      textAlign: "right",
+      color: Colors[colorScheme].text,
+      fontWeight: "bold",
+    },
+    dynamicIcon: {
+      position: "absolute",
+      left: 0,
+      right: 0,
+      bottom: 0,
+      top: 0,
+      backgroundColor: "rgba(0, 0, 0, 0.4)",
+      justifyContent: "flex-end",
+      alignItems: "flex-end",
+    },
+  });
+
+export const FilesViewerStyles = (colorScheme: "light" | "dark") =>
+  StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: "#000",
+      width: "100%",
+    },
+    fileName: {
+      color: "#fff",
+      fontSize: 16,
+      width: 200,
+    },
+    content: {
+      flex: 1,
+      paddingBottom: 20,
+    },
+    image: {
+      height: "100%",
+      width: "100%",
+      borderRadius: 10,
+      resizeMode: "contain",
+    },
+    audioContainer: {
+      flex: 1,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    audioImage: {
+      width: "100%",
+      height: "100%",
+      tintColor: "#fff",
+    },
+    unsupportedText: {
+      color: "#bbb",
+      fontSize: 16,
+      marginTop: 20,
+    },
+  });
+
+export const nearByDevicesStyles = (colorScheme: "dark" | "light") =>
+  StyleSheet.create({
+    modalView: {
+      flex: 1,
+      alignItems: "center",
+      justifyContent: "flex-start",
+      gap: 5,
+      width: "100%",
+    },
+    username: {
+      fontSize: 20,
+      color: Colors[colorScheme].text,
+      textAlign: "center",
+      marginTop: 10,
+    },
+    connectbtn: {
+      padding: 15,
+      borderRadius: 25,
+      backgroundColor: Colors[colorScheme].tint,
+      marginTop: 20,
+    },
+    logo: {
+      height: 100,
+      width: 100,
+      marginTop: 20,
+    },
+    shareButton: {
+      flexDirection: "row",
+      justifyContent: "center",
+      alignItems: "center",
+      gap: 15,
+      backgroundColor: Colors[colorScheme].tint,
+      padding: 15,
+      borderRadius: 50,
+      marginHorizontal: 40,
+      marginVertical: 5,
+    },
+    shareText: {
+      color: Colors[colorScheme].text,
+      fontSize: 28,
+    },
+    deviceListView: {
+      width: "100%",
+      flex: 1,
+      gap: 10,
+      alignItems: "center",
+      justifyContent: "space-between",
+    },
+    deviceList: {
+      flexDirection: "row",
+      padding: 20,
+      borderRadius: 20,
+      gap: 20,
+      overflow: "hidden",
+    },
+    deviceName: {
+      color: Colors[colorScheme].text,
       fontSize: 18,
     },
   });
 
+export const connectionStyles = (colorScheme: "dark" | "light") =>
+  StyleSheet.create({
+    main: {
+      flex: 1,
+      padding: 15,
+      gap: 10,
+    },
+    header: {
+      flexDirection: "row",
+      justifyContent: "space-between",
+      alignItems: "center",
+      marginBottom: 20,
+    },
+    headerButton: {
+      padding: 10,
+    },
+    fileContainer: {
+      flex: 1,
+      backgroundColor: Colors[colorScheme].transparent,
+      padding: 10,
+      borderRadius: 20,
+      height: 400,
+    },
+    sendReceiveContainer: {
+      flexDirection: "row",
+      justifyContent: "center",
+    },
+    selectedFileButtonContainer: {
+      flexDirection: "row",
+      gap: 10,
+    },
+    sendReceiveButton: {
+      flexDirection: "row",
+      gap: 5,
+      padding: 10,
+      borderRadius: 20,
+      alignItems: "center",
+      width: 140,
+      height: 50,
+      justifyContent: "center",
+    },
+    fileItem: {
+      flexDirection: "row",
+      justifyContent: "space-between",
+      padding: 10,
+      backgroundColor: Colors[colorScheme].transparent,
+      borderRadius: 10,
+    },
+    selectedFileContainer: {
+      flex: 1,
+      marginTop: 20,
+      backgroundColor: Colors[colorScheme].transparent,
+      justifyContent: "center",
+      alignItems: "center",
+      paddingHorizontal: 10,
+      paddingBottom: 10,
+      borderRadius: 20,
+      height: 400,
+    },
+    selectedFileItem: {
+      flexDirection: "row",
+      justifyContent: "space-between",
+      alignItems: "center",
+      padding: 10,
+      backgroundColor: Colors[colorScheme].transparent,
+      borderRadius: 10,
+    },
+    messageButton: {
+      position: "absolute",
+      bottom: 60,
+      right: 20,
+      padding: 15,
+      backgroundColor: Colors[colorScheme].tint,
+      borderRadius: 50,
+      justifyContent: "center",
+      alignItems: "center",
+    },
+  });
 
-export const FilesStyles = (colorScheme: 'light' | 'dark') => StyleSheet.create({
-  container: { flex: 1, backgroundColor: Colors[colorScheme].background },
-  scrollContainer: {
-    flexGrow: 1,
-  },
-  filesView: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 10,
-    padding: 10,
-    justifyContent: 'center',
-    alignItems: 'center'
-  },
-  fileItem: {
-    width: screenWidth / 3.5,
-    height: screenWidth / 3.5,
-    alignItems: "center",
-    justifyContent: "center",
-    borderRadius: 7,
-    backgroundColor: Colors[colorScheme].transparent,
-    gap: 5,
-    position: 'relative'
-  },
-  image: {
-    width: '100%',
-    height: '100%',
-    resizeMode: "cover",
-    borderRadius: 7,
-  },
-  textView: {
-    position: 'absolute',
-    top: 0,
-    right: 0,
-    bottom: 0,
-    left: 0,
-    backgroundColor: 'rgba(30, 41, 59, 0.6)',
-    padding: 5
-  },
-  text: {
-    fontSize: 13,
-    textAlign: "right",
-    color: Colors[colorScheme].text,
-    fontWeight: 'bold',
-  },
-  dynamicIcon: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    bottom: 0,
-    top: 0,
-    backgroundColor: 'rgba(0, 0, 0, 0.4)',
-    justifyContent: 'flex-end',
-    alignItems: 'flex-end',
-  }
-});
+export const ClientScreenStyles = (colorScheme: "dark" | "light") =>
+  StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: Colors[colorScheme].background,
+      padding: 10,
+    },
+    mainContainer: {
+      flex: 1,
+      alignItems: "center",
+      gap: 5,
+    },
+    deviceDot: {
+      position: "absolute",
+      justifyContent: "center",
+      alignItems: "center",
+    },
+    popup: {
+      justifyContent: "center",
+      alignItems: "center",
+      maxWidth: 120,
+    },
+    deviceImage: {
+      width: 35,
+      height: 35,
+      borderRadius: 20,
+      borderWidth: 2,
+      borderColor: "#fff",
+    },
+    deviceText: {
+      textAlign: "center",
+      paddingVertical: 2,
+      paddingHorizontal: 5,
+      borderRadius: 10,
+      maxWidth: 140,
+      color: Colors[colorScheme].text,
+      fontSize: 8,
+    },
+    animationContainer: {
+      width: "100%",
+      justifyContent: "center",
+      alignItems: "center",
+      height: screenWidth,
+    },
+    lottieContainer: {
+      position: "absolute",
+      zIndex: 4,
+      width: "100%",
+      height: "100%",
+      alignSelf: "center",
+    },
+    lottie: {
+      width: "100%",
+      height: "100%",
+    },
+    profileImage: {
+      height: 50,
+      width: 50,
+      resizeMode: "cover",
+      borderRadius: 100,
+      zIndex: 5,
+      marginTop: 5,
+    },
+    qrButton: {
+      backgroundColor: Colors[colorScheme].tint,
+      padding: 15,
+      justifyContent: "center",
+      alignItems: "center",
+      flexDirection: "row",
+      gap: 10,
+      borderRadius: 40,
+      width: 200,
+    },
+    backButton: {
+      position: "absolute",
+      padding: 10,
+    },
+    infoContainer: {
+      marginTop: 40,
+      justifyContent: "center",
+      alignItems: "center",
+      gap: 10,
+    },
+    title: {
+      color: Colors[colorScheme].text,
+      fontSize: 20,
+      textAlign: "center",
+      fontWeight: "bold",
+    },
+    subtitle: {
+      color: Colors[colorScheme].text,
+      fontSize: 20,
+      textAlign: "center",
+      opacity: 0.6,
+    },
+  });
 
-export const FilesViewerStyles = (colorScheme: 'light' | 'dark') => StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: "#000",
-    width: '100%'
-  },
-  fileName: {
-    color: "#fff",
-    fontSize: 16,
-    width: 200,
-  },
-  content: {
-    flex: 1,
-    paddingBottom: 20,
-  },
-  image: {
-    height: '100%',
-    width: '100%',
-    borderRadius: 10,
-    resizeMode: 'contain'
-  },
-  audioContainer: {
-    flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  audioImage: {
-    width: "100%",
-    height: "100%",
-    tintColor: "#fff",
-  },
-  unsupportedText: {
-    color: "#bbb",
-    fontSize: 16,
-    marginTop: 20,
-  },
-})
-
-
-export const nearByDevicesStyles = (colorScheme: "dark" | "light") => StyleSheet.create({
-  modalView: {
-    flex: 1,
-    backgroundColor: Colors[colorScheme].background,
-    alignItems: "center",
-    justifyContent: 'flex-start',
-    gap: 5,
-    width: '100%'
-  },
-  username: {
-    fontSize: 20,
-    color: Colors[colorScheme].text,
-    textAlign: "center",
-    marginTop: 10,
-  },
-  connectbtn: {
-    padding: 15,
-    borderRadius: 25,
-    backgroundColor: Colors[colorScheme].tint,
-    marginTop: 20,
-  },
-  logo: {
-    height: 100,
-    width: 100,
-    marginTop: 20,
-  },
-  shareButton: {
-    flexDirection: "row",
-    justifyContent: "center",
-    alignItems: "center",
-    gap: 15,
-    backgroundColor: Colors[colorScheme].tint,
-    padding: 20,
-    borderRadius: 50,
-    marginHorizontal: 30,
-    marginVertical: 5
-  },
-  shareText: {
-    color: Colors[colorScheme].text,
-    fontSize: 24,
-  },
-  deviceListView: {
-    width: '100%',
-    flex: 1,
-    gap: 10,
-    alignItems: 'center',
-    justifyContent: 'space-between'
-  },
-  deviceList: {
-    flexDirection: 'row',
-    padding: 20,
-    borderRadius: 20,
-    gap: 20,
-    overflow: 'hidden'
-  },
-  deviceName: {
-    color: Colors[colorScheme].text,
-    fontSize: 18,
-  }
-})
+export const ShareScreenStyles = (colorScheme: "dark" | "light") =>
+  StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: Colors[colorScheme].background,
+      padding: 10,
+    },
+    mainContainer: {
+      flex: 1,
+      alignItems: "center",
+      gap: 5,
+    },
+    backButton: {
+      position: "absolute",
+      padding: 10,
+    },
+    infoContainer: {
+      marginTop: 40,
+      justifyContent: "center",
+      alignItems: "center",
+      gap: 10,
+    },
+    animationContainer: {
+      width: "100%",
+      justifyContent: "center",
+      alignItems: "center",
+      height: screenWidth,
+    },
+    lottieContainer: {
+      position: "absolute",
+      zIndex: 4,
+      width: "100%",
+      height: "100%",
+      alignSelf: "center",
+    },
+    lottie: {
+      width: "100%",
+      height: "100%",
+    },
+    profileImage: {
+      height: 50,
+      width: 50,
+      resizeMode: "cover",
+      borderRadius: 100,
+      zIndex: 5,
+      marginTop: 5,
+    },
+    qrButton: {
+      backgroundColor: Colors[colorScheme].tint,
+      padding: 15,
+      justifyContent: "center",
+      alignItems: "center",
+      flexDirection: "row",
+      gap: 10,
+      borderRadius: 40,
+      width: 200,
+      boxShadow: `0px 0px 20px ${Colors[colorScheme].tint}`,
+    },
+  });

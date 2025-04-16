@@ -6,6 +6,7 @@ import { useTheme } from "../../hooks/ThemeProvider";
 import { FilesListStyles } from "../../constants/Styles";
 import { Toast } from "../Toasts";
 import DropShareModal from "../ui/Modal";
+import StyledText from "../ui/StyledText";
 
 interface FileCreateProps {
   createVisible: boolean;
@@ -27,7 +28,7 @@ const CreateFolder = ({
       const newFolder = `${path}/${folderName}`;
       const folderExists = await RNFS.exists(newFolder);
       if (folderName == "") {
-        Toast("Type something");
+        Toast("Namae the folder first");
       } else if (folderExists) {
         Toast(`Folder "${folderName}" already exists.`);
       } else {
@@ -58,10 +59,20 @@ const CreateFolder = ({
           />
           <View style={styles.buttonContainer}>
             <TouchableOpacity onPress={() => closeModal()}>
-              <Text style={styles.modalbutton}>Cancel</Text>
+              <StyledText
+                text="Cancel"
+                fontSize={22}
+                style={styles.modalbutton}
+                fontWeight="bold"
+              />
             </TouchableOpacity>
             <TouchableOpacity onPress={() => handleCreate()}>
-              <Text style={styles.modalbutton}>Create</Text>
+              <StyledText
+                text="Create"
+                fontSize={22}
+                style={styles.modalbutton}
+                fontWeight="bold"
+              />
             </TouchableOpacity>
           </View>
         </View>

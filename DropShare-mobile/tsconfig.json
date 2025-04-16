@@ -1,7 +1,25 @@
+// {
+//   "extends": "@react-native/typescript-config/tsconfig.json",
+//   "compilerOptions": {
+//     "esModuleInterop": true,
+//     "allowSyntheticDefaultImports": true,
+//     "types": ["node"],
+//     "typeRoots": ["./node_modules/@types", "./types"]
+//   },
+//   "include": ["src", "types/**/*.d.ts"]
+// }
+
 {
-  "extends": "@react-native/typescript-config/tsconfig.json",
   "compilerOptions": {
-    "typeRoots": ["./node_modules/@types", "./@types"]
+    "typeRoots": ["./node_modules/@types", "./src/types"],
+    "types": ["react-native", "onnxruntime-react-native"],
+    "moduleResolution": "node",
+    "esModuleInterop": true,
+    "resolveJsonModule": true,
+    "module": "esnext",
+    "target": "es2018",
+    "jsx": "react-native",
+    "strict": true
   },
-  "include": ["global.d.ts", "src"]
+  "include": ["src/**/*", "ImageClassifier.tsx", "App.tsx"]
 }

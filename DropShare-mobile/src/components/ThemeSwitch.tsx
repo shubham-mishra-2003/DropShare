@@ -1,10 +1,11 @@
 import React, { useRef, useState } from "react";
 
-import { View, Text, TouchableOpacity, Image } from "react-native";
+import { View, TouchableOpacity, Image, Vibration } from "react-native";
 import { useTheme } from "../hooks/ThemeProvider";
 import { ModeSwitchStyles } from "../constants/Styles";
 import { Colors } from "../constants/Colors";
 import { icons } from "../assets";
+import StyledText from "./ui/StyledText";
 
 const modes = [
   { value: "system", label: "System", icon: icons.contrast },
@@ -21,6 +22,7 @@ const ThemeSwitch = () => {
   const handleSelection = (value: (typeof modes)[number]["value"]) => {
     setTheme(value);
     setDropdownVisible(false);
+    Vibration.vibrate(50);
   };
 
   return (
@@ -58,7 +60,9 @@ const ThemeSwitch = () => {
                 width={20}
                 style={styles.image}
               />
-              <Text style={styles.optionText}>{mode.label}</Text>
+              <StyledText fontSize={18} fontWeight="bold">
+                {mode.label}
+              </StyledText>
             </TouchableOpacity>
           ))}
         </View>

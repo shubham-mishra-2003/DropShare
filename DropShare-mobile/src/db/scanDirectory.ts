@@ -1,22 +1,40 @@
 import RNFS from "react-native-fs";
 
 const scanDirectoryRecursive = async (
-  directoryPath: string
+  directoryPath: string,
+  maxDepth: number = 3,
+  currentDepth: number = 0
 ): Promise<RNFS.ReadDirItem[]> => {
   let results: RNFS.ReadDirItem[] = [];
+
+  const restrictedDirs = [
+    "/storage/emulated/0/Android/data",
+    "/storage/emulated/0/Android/obb",
+    "/storage/emulated/0/WhatsApp/Databases",
+    "/storage/emulated/0/WhatsApp",
+    "/storage/emulated/0/Telegram",
+    "/storage/emulated/0/DCIM/.thumbnails",
+    "/storage/emulated/0/Download/cache",
+  ];
+
+  if (
+    restrictedDirs.some((dir) => directoryPath.includes(dir)) ||
+    currentDepth > maxDepth
+  ) {
+    console.log(`Skipping path: ${directoryPath} (restricted or too deep)`);
+    return [];
+  }
+
   try {
-    const restrictedDirs = [
-      "/storage/emulated/0/Android/data",
-      "/storage/emulated/0/Android/obb",
-    ];
-    if (restrictedDirs.includes(directoryPath)) {
-      return [];
-    }
     const files = await RNFS.readDir(directoryPath);
     for (const file of files) {
       results.push(file);
-      if (file.isDirectory()) {
-        const subFiles = await scanDirectoryRecursive(file.path);
+      if (file.isDirectory() && currentDepth < maxDepth) {
+        const subFiles = await scanDirectoryRecursive(
+          file.path,
+          maxDepth,
+          currentDepth + 1
+        );
         results = [...results, ...subFiles];
       }
     }
@@ -33,5 +51,6 @@ export const scanEntireStorage = async (): Promise<RNFS.ReadDirItem[]> => {
     const files = await scanDirectoryRecursive(path);
     allFiles = [...allFiles, ...files];
   }
+  console.log(`✅ Scanned ${allFiles.length} items`);
   return allFiles;
 };

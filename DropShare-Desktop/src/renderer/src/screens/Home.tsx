@@ -26,37 +26,22 @@ const Home = () => {
   return (
     <div className="flex flex-col size-full">
       <Header icon={false} title="Drives and Files" />
-      <div className="flex p-2 size-full flex-col overflow-y-auto">
+      <div className="flex p-2 gap-10 size-full items-center flex-col overflow-y-auto w-full">
         <DrivesCard />
-        <div
-          style={{
-            flex: 1,
-            gap: 10,
-            flexWrap: "wrap",
-            justifyContent: "space-between",
-            alignItems: "center",
-            width: "100%",
-          }}
-        >
+        <div className="grid sm-p-5 p-2 w-[70%] gap-7 grid-cols-[repeat(auto-fit,minmax(130px,1fr))]">
           {categories.map((item) => (
-            <button
+            <div
               key={item.name}
+              className={`flex duration-300 hover:border-2 hover:shadow-lg gap-3 cursor-pointer flex-col rounded-xl justify-between items-center p-4 ${colorScheme == "dark" ? "border-[#308ffc] shadow-[#308ffc]" : "border-blue-400 shadow-blue-400"}`}
               style={{
-                height: 100,
-                width: 100,
-                borderRadius: 15,
-                backgroundColor: Colors[colorScheme].itemBackground,
-                justifyContent: "space-between",
-                padding: 10,
-                alignItems: "center",
-                flexDirection: "column",
+                backgroundColor: Colors[colorScheme].transparent,
               }}
               onClick={() => navigate("fileslist")}
             >
-              <h1 style={{ fontSize: 12 }}>{item.name}</h1>
-              <Icon src={item.icon} height={20} width={20} filter={1} />
-              <h1 style={{ fontSize: 12 }}>{0}</h1>
-            </button>
+              <h1 className="text-2xl font-bold text-center">{item.name}</h1>
+              <Icon src={item.icon} height={30} width={35} filter={1} />
+              <h1 className="text-2xl font-bold text-center">{0}</h1>
+            </div>
           ))}
         </div>
       </div>

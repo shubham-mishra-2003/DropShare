@@ -7,8 +7,9 @@ import BottomSheet from "../ui/BottomSheet";
 import BreakerText from "../ui/BreakerText";
 import { navigate } from "../../utils/NavigationUtil";
 import { getLocalIPAddress } from "../../utils/networkUtils";
-import { useTCP } from "../../service/TCPProvider";
 import useUsername from "../../hooks/useUsername";
+import StyledText from "../ui/StyledText";
+import { useNetwork } from "../../service/NetworkProvider";
 
 interface QRGeneratorProps {
   visible: boolean;
@@ -19,17 +20,14 @@ const QRGenerator: React.FC<QRGeneratorProps> = ({ visible, setVisible }) => {
   const { colorScheme } = useTheme();
   const [loading, setLoading] = useState(true);
   const [qrValue, setQrValue] = useState("");
-  const { startServer, server, isConnected } = useTCP();
+  const { startHosting, isConnected } = useNetwork();
   const { username } = useUsername();
   const deviceName = username;
 
   const setUpServer = async () => {
     const ip = await getLocalIPAddress();
     const port = 4000;
-
-    if (!server) {
-      startServer(port);
-    }
+    startHosting();
     setQrValue(`dropshare://${ip}:${port}|${deviceName}`);
     console.log(`Server started: ${ip}:${port}`);
     setLoading(false);
@@ -52,7 +50,7 @@ const QRGenerator: React.FC<QRGeneratorProps> = ({ visible, setVisible }) => {
     <BottomSheet
       visible={visible}
       onRequestClose={() => setVisible(false)}
-      height={500}
+      height={510}
     >
       <View
         style={{
@@ -75,24 +73,24 @@ const QRGenerator: React.FC<QRGeneratorProps> = ({ visible, setVisible }) => {
               logoBorderRadius={50}
               logo={require("../../assets/images/dropshareLogo.png")}
             />
-            <Text
+            <StyledText
+              fontWeight="bold"
               style={{
                 color: Colors[colorScheme].text,
-                fontSize: 16,
+                fontSize: 18,
                 textAlign: "center",
               }}
-            >
-              Ensure you are in same wifi network
-            </Text>
-            <Text
+              text="Ensure you are in same wifi network"
+            />
+            <StyledText
+              fontWeight="bold"
               style={{
                 color: Colors[colorScheme].text,
                 fontSize: 22,
                 textAlign: "center",
               }}
-            >
-              Ask the device to scan this QR to establish connection
-            </Text>
+              text="Ask the device to scan this QR to establish connection"
+            />
           </>
         )}
       </View>
@@ -123,9 +121,11 @@ const QRGenerator: React.FC<QRGeneratorProps> = ({ visible, setVisible }) => {
             boxShadow: `0px 0px 20px ${Colors[colorScheme].tint}`,
           }}
         >
-          <Text style={{ fontSize: 20, color: Colors[colorScheme].text }}>
-            Search by network
-          </Text>
+          <StyledText
+            fontWeight="bold"
+            style={{ fontSize: 20, color: Colors[colorScheme].text }}
+            text="Search by network"
+          />
         </TouchableOpacity>
       </View>
     </BottomSheet>

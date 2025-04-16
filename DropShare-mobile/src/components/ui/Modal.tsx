@@ -1,5 +1,5 @@
 import React from "react";
-import { Modal, View } from "react-native";
+import { Modal } from "react-native";
 
 interface ModalProps {
   children: React.ReactNode;

@@ -3,6 +3,7 @@ import React from "react";
 import DropShareModal from "./Modal";
 import { useTheme } from "../../hooks/ThemeProvider";
 import { Colors } from "../../constants/Colors";
+import LinearGradient from "react-native-linear-gradient";
 
 interface bottomSheerProps {
   children: React.ReactNode;
@@ -23,10 +24,14 @@ const BottomSheet = ({
   return (
     <DropShareModal visible={visible} onRequestClose={onRequestClose}>
       <View style={styles.overlay}>
-        <View style={styles.container}>
-          <View style={styles.line}></View>
+        <LinearGradient
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          colors={Colors[colorScheme].linearGradientColors}
+          style={styles.container}
+        >
           {children}
-        </View>
+        </LinearGradient>
       </View>
     </DropShareModal>
   );
@@ -44,18 +49,13 @@ const bottomSheetStyles = (colorScheme: "dark" | "light", height: number) =>
       right: 0,
       justifyContent: "flex-end",
     },
-    line: {
-      position: "absolute",
-      top: 10,
-      width: 40,
-      height: 5,
-      backgroundColor: "#bbb",
-      borderRadius: 50,
-    },
     container: {
       width: "100%",
       height: height,
-      backgroundColor: Colors[colorScheme].background,
+      backgroundColor:
+        colorScheme == "dark"
+          ? "rgba(0, 0, 0, 0.9)"
+          : "rgba(255, 255, 255, 0.8)",
       borderTopLeftRadius: 40,
       borderTopRightRadius: 40,
       borderTopWidth: 2,
@@ -65,6 +65,6 @@ const bottomSheetStyles = (colorScheme: "dark" | "light", height: number) =>
       padding: 10,
       justifyContent: "center",
       alignItems: "center",
-      paddingTop: 30
+      paddingTop: 30,
     },
   });

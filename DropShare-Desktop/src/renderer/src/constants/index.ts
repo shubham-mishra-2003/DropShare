@@ -8,8 +8,13 @@ export const SidebarContent = [
   },
   {
     icon: icons.share,
-    title: "Share",
-    page: "sharing",
+    title: "Host",
+    page: "hostscreen",
+  },
+  {
+    icon: icons.share,
+    title: "Client",
+    page: "clientscreen",
   },
   {
     icon: icons.bin,

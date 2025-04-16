@@ -21,17 +21,18 @@ import BackIcon from "./icons/backArrow.png";
 import PlusIcon from "./icons/plus.png";
 import folderIcon from "./icons/folder.png";
 import folderPlusIcon from "./icons/folder-plus.png";
-import archiveIcon from './icons/archive.png';
+import archiveIcon from "./icons/archive.png";
 import optionsIcon from "./icons/options.png";
 import folderCheckIcon from "./icons/folder-check.png";
 import checkIcon from "./icons/circle-check.png";
 import noCameraIcon from "./icons/camera-off.png";
-import scanQRIcon from "./icons/scan-qr-code.png"
+import scanQRIcon from "./icons/scan-qr-code.png";
 import QRIcon from "./icons/qr-code.png";
-import crossIcon from './icons/x.png';
-import disConnectIcon from './icons/disconnect.png';
-import sentIcon from './icons/arrow-big-up-dash.png'
-import receivedIcon from './icons/arrow-big-down-dash.png'
+import crossIcon from "./icons/x.png";
+import disConnectIcon from "./icons/disconnect.png";
+import sentIcon from "./icons/arrow-big-up-dash.png";
+import receivedIcon from "./icons/arrow-big-down-dash.png";
+import messageIcon from "./icons/message-circle.png";
 
 const icons = {
   sun: sunIcon,
@@ -66,6 +67,7 @@ const icons = {
   disConnect: disConnectIcon,
   sent: sentIcon,
   received: receivedIcon,
+  message: messageIcon,
 };
 
 const images = {
