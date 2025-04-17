@@ -209,22 +209,49 @@ export async function getBroadcastIPAddress(): Promise<string> {
   }
 }
 
-export const calculateChunkSize = (fileSize: number): number => {
+interface ChunkDivisionResult {
+  chunkSize: number;
+  numChunks: number;
+}
+
+export const calculateDynamicChunkDivision = (fileSize: number): ChunkDivisionResult => {
+  const MIN_CHUNK_SIZE = 1024; // 1KB
+  const MAX_CHUNK_SIZE = 64 * 1024; // 64KB
+
   let chunkSize: number;
-  if (fileSize <= 1024 * 1024) {
-    chunkSize = 16 * 1024; // <1MB: 16KB chunks
-  } else if (fileSize <= 10 * 1024 * 1024) {
-    chunkSize = 64 * 1024; // 1MB–10MB: 64KB chunks
-  } else if (fileSize <= 100 * 1024 * 1024) {
-    chunkSize = 1024 * 1024; // 10MB–100MB: 1MB chunks
+  let numChunks: number;
+
+  if (fileSize <= MIN_CHUNK_SIZE) {
+    // Handle very small files
+    chunkSize = fileSize;
+    numChunks = 1;
   } else {
-    chunkSize = 4 * 1024 * 1024; // >100MB: 4MB chunks
+    // Calculate initial number of chunks using max chunk size
+    numChunks = Math.ceil(fileSize / MAX_CHUNK_SIZE);
+
+    // Calculate chunk size to distribute file size evenly
+    chunkSize = Math.ceil(fileSize / numChunks);
+
+    // Ensure chunk size stays within bounds
+    if (chunkSize < MIN_CHUNK_SIZE) {
+      chunkSize = MIN_CHUNK_SIZE;
+      numChunks = Math.ceil(fileSize / chunkSize);
+    } else if (chunkSize > MAX_CHUNK_SIZE) {
+      chunkSize = MAX_CHUNK_SIZE;
+      numChunks = Math.ceil(fileSize / chunkSize);
+    }
+
+    // Handle uneven division by adjusting last chunk
+    // This ensures chunks are as equal as
+    const remainder = fileSize % chunkSize;
+    if (remainder > 0 && remainder < MIN_CHUNK_SIZE) {
+      // Redistribute by slightly reducing chunk size to make chunks more even
+      numChunks++;
+      chunkSize = Math.ceil(fileSize / numChunks);
+    }
   }
-  Logger.info(
-    `File size ${fileSize} bytes: Using ${chunkSize / 1024}KB chunks`
-  );
-  return chunkSize;
-};
+  return { chunkSize, numChunks };
+}
 
 export const checkTransferLimits = (
   newFileSize: number,
