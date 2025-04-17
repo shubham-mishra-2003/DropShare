@@ -369,9 +369,15 @@ const MediaPicker = ({
           if (restrictedDirs.includes(directory)) return [];
           const items = await RNFS.readDir(directory);
           if (!Array.isArray(items)) return [];
+          const filteredItems = items.filter(
+            (item) =>
+              !item.name.startsWith(".") &&
+              !item.name.startsWith("._") &&
+              !item.name.endsWith("~")
+          );
 
           let allFiles: RNFS.ReadDirItem[] = [];
-          for (const item of items) {
+          for (const item of filteredItems) {
             if (
               item.isFile() &&
               selectedCategory.extensions.some((ext) => item.name.endsWith(ext))
@@ -398,7 +404,12 @@ const MediaPicker = ({
 
       try {
         const fetchedFiles = await fetchFiles(rootPath);
-        setFiles(fetchedFiles);
+        const sortedFiles = fetchedFiles.sort((a, b) => {
+          const timeA = a.mtime?.getTime() || 0;
+          const timeB = b.mtime?.getTime() || 0;
+          return timeB - timeA;
+        });
+        setFiles(sortedFiles);
       } catch (error) {
         console.error("Error fetching files:", error);
         setFiles([]);
@@ -406,7 +417,6 @@ const MediaPicker = ({
         setLoading(false);
       }
     };
-
     if (visible) {
       loadFiles();
     }

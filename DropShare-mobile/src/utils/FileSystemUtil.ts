@@ -284,3 +284,5 @@ export const formatFileSize = (sizeInBytes: number): string => {
     return sizeInBytes + " B";
   }
 };
+
+export const savePath = `${RNFS.DocumentDirectoryPath}/DropShare`;

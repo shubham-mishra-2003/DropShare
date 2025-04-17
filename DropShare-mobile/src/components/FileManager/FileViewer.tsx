@@ -66,16 +66,16 @@ const FileViewer: React.FC = () => {
   const isPdf = fileExtension === "pdf";
 
   // Log current file details
-  useEffect(() => {
-    console.log("Current file:", {
-      path: filePath,
-      extension: fileExtension,
-      isImage,
-      isVideo,
-      isAudio,
-      isPdf,
-    });
-  }, [currentFileIndex, filePath, fileExtension]);
+  // useEffect(() => {
+  //   console.log("Current file:", {
+  //     path: filePath,
+  //     extension: fileExtension,
+  //     isImage,
+  //     isVideo,
+  //     isAudio,
+  //     isPdf,
+  //   });
+  // }, [currentFileIndex, filePath, fileExtension]);
 
   const onClose = () => {
     console.log("Closing FileViewer");
@@ -100,16 +100,16 @@ const FileViewer: React.FC = () => {
     const isItemPdf = itemExtension === "pdf";
 
     // Log rendering details
-    console.log("Rendering item:", {
-      path: itemPath,
-      extension: itemExtension,
-      isImage: isItemImage,
-      isVideo: isItemVideo,
-      isAudio: isItemAudio,
-      isPdf: isItemPdf,
-      index,
-      isActive: index === currentFileIndex,
-    });
+    // console.log("Rendering item:", {
+    //   path: itemPath,
+    //   extension: itemExtension,
+    //   isImage: isItemImage,
+    //   isVideo: isItemVideo,
+    //   isAudio: isItemAudio,
+    //   isPdf: isItemPdf,
+    //   index,
+    //   isActive: index === currentFileIndex,
+    // });
 
     return (
       <View style={localStyles.itemContainer}>
@@ -175,7 +175,7 @@ const FileViewer: React.FC = () => {
     if (viewableItems.length > 0) {
       const newIndex = viewableItems[0].index;
       if (newIndex !== null && newIndex !== undefined) {
-        console.log("Swiped to index:", newIndex);
+        // console.log("Swiped to index:", newIndex);
         setCurrentFileIndex(newIndex);
       }
     }

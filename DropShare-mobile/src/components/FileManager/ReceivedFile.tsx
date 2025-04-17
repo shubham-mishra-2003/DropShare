@@ -14,12 +14,11 @@ import Header from "../ui/Header";
 import { goBack, navigate } from "../../utils/NavigationUtil";
 import useSelectFile from "../../hooks/useSelectFile";
 import { FilesStyles } from "../../constants/Styles";
-import { formatFileSize } from "../../utils/FileSystemUtil";
+import { formatFileSize, savePath } from "../../utils/FileSystemUtil";
 import { Toast } from "../Toasts";
 import LinearGradient from "react-native-linear-gradient";
 
 const ReceivedFile = () => {
-  const path = `${RNFS.ExternalStorageDirectoryPath}/Dropshare`;
   const [receivedFiles, setReceivedFiles] = useState<RNFS.ReadDirItem[]>([]);
   const { colorScheme } = useTheme();
   const [loading, setLoading] = useState(true);
@@ -27,11 +26,11 @@ const ReceivedFile = () => {
   useEffect(() => {
     setLoading(true);
     const fetchFiles = async () => {
-      const folderExists = await RNFS.exists(path);
+      const folderExists = await RNFS.exists(savePath);
       if (!folderExists) {
-        RNFS.mkdir(path);
+        RNFS.mkdir(savePath);
       } else {
-        RNFS.readDir(path)
+        RNFS.readDir(savePath)
           .then((receivedFile) => {
             setReceivedFiles(receivedFile);
             setLoading(false);
@@ -89,7 +88,12 @@ const ReceivedFile = () => {
                     } else if (selectedFiles.length > 0) {
                       setSelectedFiles((prev) => [...prev, file]);
                     } else {
-                      navigate("fileviewer", { file });
+                      navigate("fileviewer", {
+                        files: receivedFiles,
+                        currentIndex: receivedFiles.findIndex(
+                          (f) => f.path === file.path
+                        ),
+                      });
                     }
                   }}
                   onLongPress={() =>

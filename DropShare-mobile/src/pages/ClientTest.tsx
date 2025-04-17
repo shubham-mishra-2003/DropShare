@@ -15,6 +15,7 @@ import { Colors } from "../constants/Colors";
 import { useTheme } from "../hooks/ThemeProvider";
 import MediaPicker from "../components/MediaPicker";
 import StyledText from "../components/ui/StyledText";
+import TCPSocket from "react-native-tcp-socket";
 
 const MAX_CONCURRENT_FILES = 15;
 const MAX_TOTAL_SIZE = 5 * 1024 * 1024 * 1024; // 5GB
@@ -169,7 +170,9 @@ const ClientTest: React.FC = () => {
     for (const file of selectToSend) {
       const fileData = await RNFS.readFile(file.path, "base64");
       const buffer = Buffer.from(fileData, "base64");
-      await sendFile(file.path, buffer);
+      await sendMultipleFiles(
+        [{ filePath: file.path, fileData: buffer }],
+      );
     }
     setSelectToSend([]);
     setPickerVisible(false);
@@ -236,8 +239,7 @@ const ClientTest: React.FC = () => {
               renderItem={({ item }) => (
                 <View style={styles.transferCard}>
                   <Text style={styles.transferText}>
-                    {item.fileName} - {item.progress} ({item.receivedChunks}/
-                    {item.totalChunks} chunks)
+                    {item.fileName} - {item.status}
                   </Text>
                 </View>
               )}

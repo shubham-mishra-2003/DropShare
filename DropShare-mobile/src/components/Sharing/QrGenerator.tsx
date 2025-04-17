@@ -6,7 +6,7 @@ import { Colors } from "../../constants/Colors";
 import BottomSheet from "../ui/BottomSheet";
 import BreakerText from "../ui/BreakerText";
 import { navigate } from "../../utils/NavigationUtil";
-import { getLocalIPAddress } from "../../utils/networkUtils";
+import { getLocalIPAddress } from "../../utils/NetworkUtils";
 import useUsername from "../../hooks/useUsername";
 import StyledText from "../ui/StyledText";
 import { useNetwork } from "../../service/NetworkProvider";

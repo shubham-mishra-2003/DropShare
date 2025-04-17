@@ -61,9 +61,9 @@ const HostTest: React.FC = () => {
           <Text style={styles.subtitle}>Connected Devices</Text>
           <FlatList
             data={devices}
-            keyExtractor={(item) => item.ip}
-            renderItem={({ item }) => (
-              <View style={styles.card}>
+            keyExtractor={(item, index) => `${item.ip}-${index}`}
+            renderItem={({ item, index }) => (
+              <View key={index} style={styles.card}>
                 <Text style={styles.cardText}>
                   {item.name} ({item.ip})
                 </Text>
@@ -84,8 +84,8 @@ const HostTest: React.FC = () => {
           <FlatList
             data={messages}
             keyExtractor={(_, index) => index.toString()}
-            renderItem={({ item }) => (
-              <View style={styles.messageCard}>
+            renderItem={({ item, index }) => (
+              <View key={index} style={styles.messageCard}>
                 <Text style={styles.messageText}>{item}</Text>
               </View>
             )}
@@ -95,9 +95,9 @@ const HostTest: React.FC = () => {
           <Text style={styles.subtitle}>Received Files</Text>
           <FlatList
             data={receivedFiles}
-            keyExtractor={(item) => item}
-            renderItem={({ item }) => (
-              <View style={styles.fileCard}>
+            keyExtractor={(item, index) => `${item}-${index}`}
+            renderItem={({ item, index }) => (
+              <View key={index} style={styles.fileCard}>
                 <Text style={styles.fileText}>{item.split("/").pop()}</Text>
               </View>
             )}

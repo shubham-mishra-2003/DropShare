@@ -49,7 +49,7 @@ const DropshareConnect = () => {
             style={styles.logo}
           />
           <StyledText fontWeight="bold" style={styles.username}>
-            Display name: {username}
+            Display name: {username || "DropShare User"}
           </StyledText>
           <TouchableOpacity
             onPress={() => {

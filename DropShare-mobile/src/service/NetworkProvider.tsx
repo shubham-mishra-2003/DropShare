@@ -5,13 +5,12 @@ import {
   sendHostFile,
   sendMultipleHostFiles,
   stopHostServer,
-  kickClient,
+  // kickClient,
 } from "../service/HostServer";
 import {
   startClientDiscovery,
   connectToHost,
   sendMessage,
-  sendFile,
   sendMultipleFiles,
   stopClientDiscovery,
   disconnectFromHost,
@@ -111,7 +110,7 @@ export const NetworkProvider: React.FC<{ children: React.ReactNode }> = ({
       return;
     }
     if (isHost) {
-      sendHostMessage(socket as TCPSocket.Server, message, username);
+      sendHostMessage(message, username);
     } else {
       sendMessage(socket as TCPSocket.Socket, message, username);
     }
@@ -136,13 +135,13 @@ export const NetworkProvider: React.FC<{ children: React.ReactNode }> = ({
         setTransferProgress
       );
     } else {
-      await sendFile(
-        socket as TCPSocket.Socket,
-        filePath,
-        fileData,
-        username,
-        setTransferProgress
-      );
+      // await sendFile(
+      //   socket as TCPSocket.Socket,
+      //   filePath,
+      //   fileData,
+      //   username,
+      //   setTransferProgress
+      // );
     }
     setSentFiles((prev) => [
       ...prev,
@@ -210,7 +209,7 @@ export const NetworkProvider: React.FC<{ children: React.ReactNode }> = ({
 
   const kickClientHandler = (clientIp: string) => {
     if (isHost) {
-      kickClient(clientIp);
+      // kickClient(clientIp);
       setDevices((prev) => prev.filter((d) => d.ip !== clientIp));
       Logger.info(`Kicked client ${clientIp} via NetworkProvider`);
       Logger.toast(`Kicked client ${clientIp}`, "info");

@@ -975,7 +975,7 @@
 //   getBroadcastIPAddress,
 //   calculateChunkSize,
 //   checkTransferLimits,
-// } from "../utils/networkUtils";
+// } from "../utils/NetworkUtils";
 // import RNFS from "react-native-fs";
 // import { Buffer } from "buffer";
 // import { chunkStorage } from "./ChunkStorage";
@@ -1772,55 +1772,3079 @@
 //   Logger.toast(`Kicked client ${clientIp}`, "info");
 // }
 
+// import dgram from "react-native-udp";
+// import {
+//   getLocalIPAddress,
+//   getBroadcastIPAddress,
+//   calculateChunkSize,
+//   checkTransferLimits,
+// } from "../utils/networkUtils";
+// import RNFS from "react-native-fs";
+// import { Buffer } from "buffer";
+// import { chunkStorage } from "./ChunkStorage";
+// import { Logger } from "../utils/Logger";
+// import { DropShareError, ERROR_CODES } from "../utils/Error";
+// import TCPSocket from "react-native-tcp-socket";
+// import { generateAESKey, encryptData, decryptData } from "../utils/Crypto";
+
+// type UdpSocket = ReturnType<typeof dgram.createSocket>;
+
+// const UDP_PORT = 5000;
+// const TCP_PORT = 6000;
+// const ACK_TIMEOUT = 10000; // Increased to 10 seconds
+// const MAX_CLIENTS = 5;
+// const MAX_RETRIES = 3;
+
+// interface ConnectedSocket extends TCPSocket.Socket {
+//   sessionKey?: string;
+//   iv?: string;
+// }
+// let connectedSockets: ConnectedSocket[] = [];
+// let isServerRunning = false;
+// let udpSocket: UdpSocket | null = null;
+// let server: TCPSocket.Server | null = null;
+// const TRANSFER_QUEUE: {
+//   socket: ConnectedSocket;
+//   fileId: string;
+//   chunkIndex: number;
+// }[] = [];
+
+// export async function startHostServer(
+//   username: string,
+//   setDevices: React.Dispatch<React.SetStateAction<Device[]>>,
+//   setSocket: React.Dispatch<React.SetStateAction<TCPSocket.Server | null>>,
+//   setMessages: React.Dispatch<React.SetStateAction<string[]>>,
+//   setReceivedFiles: React.Dispatch<React.SetStateAction<string[]>>,
+//   setTransferProgress?: React.Dispatch<React.SetStateAction<TransferProgress[]>>
+// ): Promise<void> {
+//   if (isServerRunning) {
+//     Logger.info("Host server already running, skipping start.");
+//     return;
+//   }
+//   isServerRunning = true;
+
+//   try {
+//     await chunkStorage.initialize();
+//     const ip = await getLocalIPAddress();
+//     const broadcastAddr = await getBroadcastIPAddress();
+//     Logger.info(`Host started on IP: ${ip}, Broadcasting to: ${broadcastAddr}`);
+
+//     udpSocket = dgram.createSocket({ type: "udp4" });
+//     udpSocket.bind(UDP_PORT);
+
+//     udpSocket.once("listening", () => {
+//       Logger.info(`UDP Socket bound to port ${UDP_PORT}`);
+//       udpSocket!.setBroadcast(true);
+//       const broadcastInterval = setInterval(() => {
+//         const message = JSON.stringify({ role: "Host", ip, name: username });
+//         udpSocket!.send(
+//           Buffer.from(message),
+//           0,
+//           message.length,
+//           UDP_PORT,
+//           broadcastAddr,
+//           (err) => {
+//             if (err) Logger.error("UDP Send Error", err);
+//           }
+//         );
+//       }, 2000);
+
+//       udpSocket!.on("close", () => clearInterval(broadcastInterval));
+//     });
+
+//     udpSocket.on("error", (err: Error) => {
+//       Logger.error("UDP Socket Error", err);
+//       isServerRunning = false;
+//       udpSocket?.close();
+//       udpSocket = null;
+//     });
+
+//     server = new TCPSocket.Server();
+//     server.on("connection", async (socket: ConnectedSocket) => {
+//       if (connectedSockets.length >= MAX_CLIENTS) {
+//         socket.write(Buffer.from(`ERROR:${ERROR_CODES.MAX_CLIENTS_REACHED}\n`));
+//         socket.destroy();
+//         Logger.warn("Max clients reached, rejecting new connection");
+//         return;
+//       }
+
+//       Logger.info(`Client connected: ${socket.remoteAddress}`);
+//       connectedSockets.push(socket);
+//       setSocket(server);
+//       setDevices((prev) => [
+//         ...prev.filter((d) => d.ip !== socket.remoteAddress),
+//         {
+//           ip: socket.remoteAddress || "Unknown",
+//           name: "Unknown",
+//           role: "Client",
+//         },
+//       ]);
+
+//       const fileTransfers = new Map<string, FileTransfer>();
+//       let buffer = Buffer.alloc(0);
+//       let inFileTransfer = false;
+
+//       const { key, iv } = await generateAESKey();
+//       socket.sessionKey = key;
+//       socket.iv = iv;
+//       socket.write(Buffer.from(`SESSION:${key}:${iv}\n`));
+//       Logger.info(
+//         `Sent SESSION key: ${key}, IV: ${iv} to ${socket.remoteAddress}`
+//       );
+
+//       socket.on("data", async (data: string | Buffer) => {
+//         try {
+//           Logger.info(
+//             `Received data from ${socket.remoteAddress} (length: ${
+//               data.length
+//             }): ${data.toString().slice(0, 50)}...`
+//           );
+//           buffer = Buffer.concat([
+//             buffer,
+//             typeof data === "string" ? Buffer.from(data) : data,
+//           ]);
+//           Logger.info(`Buffer length: ${buffer.length}`);
+
+//           while (buffer.length > 0) {
+//             const dataStr = buffer.toString();
+//             const validPrefixes = [
+//               "FILE:",
+//               "CHUNK:",
+//               "MSG:",
+//               "CHECK_CHUNKS:",
+//               "ACK_START:",
+//               "ACK_CHUNKS:",
+//               "ACK_CHUNK:",
+//               "SESSION:",
+//               "ERROR:",
+//             ];
+//             const hasValidPrefix = validPrefixes.some((prefix) =>
+//               dataStr.startsWith(prefix)
+//             );
+
+//             if (!hasValidPrefix) {
+//               Logger.warn(
+//                 `Invalid data from ${socket.remoteAddress}: ${dataStr.slice(
+//                   0,
+//                   50
+//                 )}...`
+//               );
+//               socket.write(
+//                 Buffer.from(
+//                   `ERROR:${ERROR_CODES.INVALID_HEADER}:Invalid protocol\n`
+//                 )
+//               );
+//               buffer = Buffer.alloc(0);
+//               return;
+//             }
+
+//             if (!inFileTransfer) {
+//               if (dataStr.startsWith("FILE:")) {
+//                 const headerEnd = buffer.indexOf(Buffer.from("\n\n"));
+//                 if (headerEnd === -1) {
+//                   Logger.info(
+//                     `Incomplete FILE header from ${socket.remoteAddress}, waiting...`
+//                   );
+//                   return;
+//                 }
+//                 const headerStr = buffer.slice(5, headerEnd).toString();
+//                 Logger.info(`Received raw FILE header: ${headerStr}`);
+//                 let headerData: {
+//                   name: string;
+//                   size: number;
+//                   sender: string;
+//                   fileId: string;
+//                 };
+//                 try {
+//                   headerData = JSON.parse(headerStr);
+//                   Logger.info(
+//                     `Parsed FILE header: ${JSON.stringify(headerData)}`
+//                   );
+//                 } catch (error) {
+//                   Logger.error(
+//                     `Failed to parse FILE header: ${headerStr}`,
+//                     error
+//                   );
+//                   throw new DropShareError(
+//                     ERROR_CODES.INVALID_HEADER,
+//                     "Invalid file header"
+//                   );
+//                 }
+
+//                 const fileName = headerData.name;
+//                 const fileSize = headerData.size;
+//                 const deviceName = headerData.sender || "Unknown";
+//                 const fileId = headerData.fileId;
+
+//                 if (!fileName || !fileSize || !fileId) {
+//                   throw new DropShareError(
+//                     ERROR_CODES.INVALID_HEADER,
+//                     "Missing file name, size, or ID"
+//                   );
+//                 }
+
+//                 if (!checkTransferLimits(fileSize, fileTransfers)) {
+//                   socket.write(
+//                     Buffer.from(
+//                       `ERROR:${ERROR_CODES.TRANSFER_LIMIT_EXCEEDED}\n`
+//                     )
+//                   );
+//                   Logger.toast(
+//                     `Transfer limit exceeded for ${fileName}`,
+//                     "error"
+//                   );
+//                   buffer = Buffer.alloc(0);
+//                   return;
+//                 }
+
+//                 let transfer = fileTransfers.get(fileId);
+//                 let record = await chunkStorage.getTransferRecord(fileId);
+//                 let startChunkIndex = 0;
+
+//                 if (record && record.status !== "completed") {
+//                   startChunkIndex = record.lastChunkIndex + 1;
+//                   socket.write(
+//                     Buffer.from(
+//                       `ACK_START:${fileId}:${record.lastChunkIndex}\n`
+//                     )
+//                   );
+//                   Logger.info(
+//                     `Resuming transfer ${fileId} from chunk ${startChunkIndex}`
+//                   );
+//                 } else {
+//                   const chunkSize = calculateChunkSize(fileSize);
+//                   const totalChunks = Math.ceil(fileSize / chunkSize);
+//                   const { key, iv } = await generateAESKey();
+//                   Logger.info(
+//                     `Generated chunk AES key: ${key}, IV: ${iv} for ${fileId}`
+//                   );
+//                   record = {
+//                     fileId,
+//                     fileName,
+//                     totalSize: fileSize,
+//                     chunkSize,
+//                     lastChunkIndex: -1,
+//                     totalChunks,
+//                     status: "in_progress",
+//                     senderIp: socket.remoteAddress || "Unknown",
+//                     timestamp: Date.now(),
+//                     aesKey: key,
+//                     iv,
+//                     direction: "receiving",
+//                   };
+//                   await chunkStorage.saveTransferRecord(record);
+//                   socket.write(Buffer.from(`ACK_START:${fileId}:-1\n`));
+//                   Logger.info(
+//                     `Started new transfer ${fileId} (${fileSize} bytes) from ${deviceName}`
+//                   );
+//                 }
+
+//                 if (!transfer) {
+//                   transfer = {
+//                     fileId,
+//                     fileName,
+//                     fileSize,
+//                     deviceName,
+//                     chunks: Array(record.totalChunks).fill(undefined),
+//                     receivedBytes: startChunkIndex * record.chunkSize,
+//                     startTime: Date.now(),
+//                     totalChunks: record.totalChunks,
+//                     chunkSize: record.chunkSize,
+//                     totalSize: fileSize,
+//                     senderIp: socket.remoteAddress || "Unknown",
+//                     chunkHashes: [],
+//                     status: "Receiving",
+//                     progress: 0,
+//                     lastChunkIndex: startChunkIndex - 1,
+//                   };
+//                   fileTransfers.set(fileId, transfer);
+//                 }
+
+//                 inFileTransfer = true;
+//                 buffer = buffer.slice(headerEnd + 2);
+//               } else if (dataStr.startsWith("CHECK_CHUNKS:")) {
+//                 Logger.info(`Processing CHECK_CHUNKS: ${dataStr}`);
+//                 const messageEnd = buffer.indexOf(Buffer.from("\n"));
+//                 if (messageEnd === -1) {
+//                   Logger.info(
+//                     `Incomplete CHECK_CHUNKS from ${socket.remoteAddress}, waiting...`
+//                   );
+//                   return;
+//                 }
+//                 const message = buffer.slice(0, messageEnd).toString();
+//                 const [, fileId, lastSentIndex] = message.split(":");
+//                 const record = await chunkStorage.getTransferRecord(fileId);
+//                 const lastReceivedIndex = record ? record.lastChunkIndex : -1;
+//                 socket.write(
+//                   Buffer.from(`ACK_CHUNKS:${fileId}:${lastReceivedIndex}\n`)
+//                 );
+//                 Logger.info(`Sent ACK_CHUNKS:${fileId}:${lastReceivedIndex}`);
+//                 buffer = buffer.slice(messageEnd + 1);
+//               } else if (dataStr.startsWith("MSG:")) {
+//                 const messageEnd = buffer.indexOf(Buffer.from("\n"));
+//                 if (messageEnd === -1) {
+//                   Logger.info(
+//                     `Incomplete MSG from ${socket.remoteAddress}, waiting...`
+//                   );
+//                   return;
+//                 }
+//                 const encryptedMsg = buffer.slice(4, messageEnd).toString();
+//                 const [iv, encrypted] = encryptedMsg.split(":");
+//                 const decrypted = await decryptData(
+//                   Buffer.from(encrypted, "base64"),
+//                   socket.sessionKey || "",
+//                   iv
+//                 );
+//                 const message = decrypted.toString();
+//                 Logger.info(`Decrypted MSG: ${message}`);
+//                 setMessages((prev) => [
+//                   ...prev,
+//                   `${socket.remoteAddress}: ${message}`,
+//                 ]);
+//                 connectedSockets
+//                   .filter((s) => s !== socket)
+//                   .forEach(async (s) => {
+//                     const newIv = CryptoJS.lib.WordArray.random(16).toString(
+//                       CryptoJS.enc.Hex
+//                     );
+//                     const reEncrypted = await encryptData(
+//                       Buffer.from(message),
+//                       s.sessionKey || "",
+//                       newIv
+//                     );
+//                     s.write(
+//                       Buffer.from(
+//                         `MSG:${newIv}:${reEncrypted.toString("base64")}\n`
+//                       )
+//                     );
+//                     Logger.info(`Forwarded MSG to ${s.remoteAddress}`);
+//                   });
+//                 buffer = buffer.slice(messageEnd + 1);
+//               } else if (dataStr.startsWith("CHUNK:")) {
+//                 const chunkEnd = buffer.indexOf(Buffer.from("\n"));
+//                 if (chunkEnd === -1) {
+//                   Logger.info(
+//                     `Incomplete CHUNK header from ${socket.remoteAddress}, waiting...`
+//                   );
+//                   return;
+//                 }
+//                 const chunkHeader = buffer.slice(0, chunkEnd).toString();
+//                 Logger.info(`Received CHUNK header: ${chunkHeader}`);
+//                 const [, fileId, chunkIndexStr, iv, encrypted] =
+//                   chunkHeader.split(":");
+//                 const chunkIndex = parseInt(chunkIndexStr);
+//                 const record = await chunkStorage.getTransferRecord(fileId);
+//                 if (!record) {
+//                   Logger.warn(`No record for ${fileId}, ignoring chunk`);
+//                   buffer = Buffer.alloc(0);
+//                   return;
+//                 }
+//                 Logger.info(
+//                   `Retrieved chunk AES key: ${record.aesKey}, IV: ${iv} for ${fileId}`
+//                 );
+//                 let chunkData: Buffer;
+//                 try {
+//                   chunkData = await decryptData(
+//                     Buffer.from(encrypted, "base64"),
+//                     record.aesKey || "",
+//                     iv
+//                   );
+//                   Logger.info(
+//                     `Decrypted chunk ${chunkIndex} for ${fileId}: ${chunkData
+//                       .toString("hex")
+//                       .slice(0, 50)}... (${chunkData.length} bytes)`
+//                   );
+//                 } catch (error) {
+//                   Logger.error(
+//                     `Failed to decrypt chunk ${chunkIndex} for ${fileId}`,
+//                     error
+//                   );
+//                   socket.write(
+//                     Buffer.from(
+//                       `ERROR:${ERROR_CODES.DECRYPTION_FAILED}:Decryption failed\n`
+//                     )
+//                   );
+//                   buffer = Buffer.alloc(0);
+//                   return;
+//                 }
+//                 const transfer = fileTransfers.get(fileId)!;
+//                 await chunkStorage.saveChunk(fileId, chunkIndex, chunkData);
+//                 transfer.chunks[chunkIndex] = chunkData;
+//                 transfer.receivedBytes += chunkData.length;
+//                 await chunkStorage.updateLastChunkIndex(fileId, chunkIndex);
+//                 socket.write(
+//                   Buffer.from(`ACK_CHUNK:${fileId}:${chunkIndex}\n`)
+//                 );
+//                 Logger.info(
+//                   `Sent ACK_CHUNK for ${fileId}:${chunkIndex}, ${transfer.receivedBytes}/${transfer.totalSize} bytes`
+//                 );
+
+//                 const elapsedTime =
+//                   (Date.now() - transfer.startTime) / 1000 || 1;
+//                 const speed = (
+//                   transfer.receivedBytes /
+//                   elapsedTime /
+//                   1024
+//                 ).toFixed(2);
+//                 const percentage =
+//                   (transfer.receivedBytes / transfer.totalSize) * 100;
+//                 setTransferProgress?.((prev) => [
+//                   ...prev.filter((p) => p.fileId !== fileId),
+//                   {
+//                     fileId,
+//                     fileName: transfer.fileName,
+//                     progress: `${transfer.receivedBytes}/${transfer.totalSize} bytes`,
+//                     speed: `${speed} KB/s`,
+//                     percentage,
+//                   },
+//                 ]);
+
+//                 if (transfer.receivedBytes >= transfer.totalSize) {
+//                   const savePath = await chunkStorage.assembleFile(
+//                     fileId,
+//                     transfer.fileName
+//                   );
+//                   setReceivedFiles((prev) => [...prev, savePath]);
+//                   Logger.info(
+//                     `Received and saved file: ${savePath} from ${transfer.deviceName}`
+//                   );
+//                   fileTransfers.delete(fileId);
+//                   inFileTransfer = false;
+//                 }
+//                 buffer = buffer.slice(chunkEnd + 1);
+//               } else if (
+//                 dataStr.startsWith("SESSION:") ||
+//                 dataStr.startsWith("ACK_START:") ||
+//                 dataStr.startsWith("ACK_CHUNKS:") ||
+//                 dataStr.startsWith("ACK_CHUNK:") ||
+//                 dataStr.startsWith("ERROR:")
+//               ) {
+//                 const messageEnd = buffer.indexOf(Buffer.from("\n"));
+//                 if (messageEnd === -1) {
+//                   Logger.info(
+//                     `Incomplete ${dataStr.slice(0, 10)} from ${
+//                       socket.remoteAddress
+//                     }, waiting...`
+//                   );
+//                   return;
+//                 }
+//                 Logger.info(
+//                   `Processed ${dataStr.slice(0, 10)}: ${dataStr.slice(
+//                     0,
+//                     messageEnd
+//                   )}`
+//                 );
+//                 buffer = buffer.slice(messageEnd + 1);
+//               } else {
+//                 Logger.warn(
+//                   `Unknown data from ${socket.remoteAddress}: ${dataStr.slice(
+//                     0,
+//                     50
+//                   )}...`
+//                 );
+//                 socket.write(
+//                   Buffer.from(
+//                     `ERROR:${ERROR_CODES.INVALID_HEADER}:Invalid protocol\n`
+//                   )
+//                 );
+//                 buffer = Buffer.alloc(0);
+//               }
+//             }
+//           }
+//         } catch (error) {
+//           Logger.error(
+//             `Error processing data from ${socket.remoteAddress}`,
+//             error
+//           );
+//           const err = DropShareError.from(
+//             error,
+//             ERROR_CODES.NETWORK_ERROR,
+//             "Data processing failed"
+//           );
+//           socket.write(Buffer.from(`ERROR:${err.code}:${err.message}\n`));
+//           buffer = Buffer.alloc(0);
+//           inFileTransfer = false;
+//         }
+//       });
+
+//       socket.on("close", () => {
+//         Logger.info(`Client disconnected: ${socket.remoteAddress}`);
+//         connectedSockets = connectedSockets.filter((s) => s !== socket);
+//         setDevices((prev) => prev.filter((d) => d.ip !== socket.remoteAddress));
+//       });
+
+//       socket.on("error", (err) => {
+//         Logger.error(`Host Socket Error for ${socket.remoteAddress}`, err);
+//       });
+//     });
+
+//     server.listen({ port: TCP_PORT, host: "0.0.0.0" }, () => {
+//       Logger.info(`Host TCP server running on port ${TCP_PORT}`);
+//     });
+
+//     server.on("error", (err) => {
+//       Logger.error("Server Error", err);
+//       stopHostServer();
+//     });
+
+//     server.on("close", () => {
+//       Logger.info("Host TCP server closed");
+//       isServerRunning = false;
+//     });
+//   } catch (err) {
+//     Logger.error("Failed to start host server", err);
+//     isServerRunning = false;
+//     stopHostServer();
+//   }
+// }
+
+// async function sendFileInChunks(
+//   socket: ConnectedSocket,
+//   fileName: string,
+//   filePath: string,
+//   deviceName: string,
+//   fileId: string,
+//   setTransferProgress?: React.Dispatch<React.SetStateAction<TransferProgress[]>>
+// ): Promise<void> {
+//   try {
+//     const fileSize = (await RNFS.stat(filePath)).size;
+//     const chunkSize = calculateChunkSize(fileSize);
+//     const totalChunks = Math.ceil(fileSize / chunkSize);
+//     const record = await chunkStorage.getTransferRecord(fileId);
+//     let lastSentChunkIndex = record ? record.lastChunkIndex : -1;
+
+//     let retries = 0;
+//     while (retries < MAX_RETRIES) {
+//       try {
+//         await new Promise<void>((resolve, reject) => {
+//           const timeout = setTimeout(() => {
+//             reject(
+//               new DropShareError(
+//                 ERROR_CODES.NETWORK_ERROR,
+//                 `Timeout waiting for ACK_CHUNKS (attempt ${retries + 1})`
+//               )
+//             );
+//           }, ACK_TIMEOUT);
+//           socket.once("data", (data) => {
+//             clearTimeout(timeout);
+//             const message = data.toString();
+//             Logger.info(`Received for CHECK_CHUNKS: ${message}`);
+//             if (message.startsWith("ACK_CHUNKS:")) {
+//               const [, ackFileId, lastReceivedIndex] = message.split(":");
+//               if (ackFileId === fileId) {
+//                 lastSentChunkIndex = Math.min(
+//                   parseInt(lastReceivedIndex),
+//                   lastSentChunkIndex
+//                 );
+//                 resolve();
+//               } else {
+//                 reject(
+//                   new DropShareError(
+//                     ERROR_CODES.INVALID_HEADER,
+//                     "Invalid ACK_CHUNKS response"
+//                   )
+//                 );
+//               }
+//             }
+//           });
+//           Logger.info(
+//             `Sending CHECK_CHUNKS (attempt ${
+//               retries + 1
+//             }): ${fileId}:${lastSentChunkIndex}`
+//           );
+//           socket.write(
+//             Buffer.from(`CHECK_CHUNKS:${fileId}:${lastSentChunkIndex}\n`)
+//           );
+//         });
+//         break;
+//       } catch (error) {
+//         retries++;
+//         if (retries === MAX_RETRIES) {
+//           throw error;
+//         }
+//         Logger.warn(`Retrying CHECK_CHUNKS for ${fileId} after error ${error}`);
+//         await new Promise((resolve) => setTimeout(resolve, 1000));
+//       }
+//     }
+
+//     const header = Buffer.from(
+//       `FILE:${JSON.stringify({
+//         name: fileName,
+//         size: fileSize,
+//         sender: deviceName,
+//         fileId,
+//       })}\n\n`
+//     );
+
+//     await new Promise<void>((resolve, reject) => {
+//       socket.write(header, "base64", (err?: Error) => {
+//         if (err) {
+//           Logger.error("Socket write error", err);
+//           reject(err);
+//         } else {
+//           resolve();
+//         }
+//       });
+//     });
+//     Logger.info(`Sent header for ${fileId}: ${header.toString()}`);
+
+//     let sentBytes = (lastSentChunkIndex + 1) * chunkSize;
+//     const startTime = Date.now();
+//     const { key, iv } = await generateAESKey();
+//     Logger.info(`Generated chunk AES key: ${key}, IV: ${iv} for ${fileId}`);
+
+//     if (!record) {
+//       await chunkStorage.saveTransferRecord({
+//         fileId,
+//         fileName,
+//         filePath,
+//         totalSize: fileSize,
+//         chunkSize,
+//         lastChunkIndex: -1,
+//         totalChunks,
+//         status: "in_progress",
+//         senderIp: await getLocalIPAddress(),
+//         timestamp: Date.now(),
+//         aesKey: key,
+//         iv,
+//         direction: "sending",
+//       });
+//     }
+
+//     for (
+//       let chunkIndex = lastSentChunkIndex + 1;
+//       chunkIndex < totalChunks;
+//       chunkIndex++
+//     ) {
+//       const offset = chunkIndex * chunkSize;
+//       const length = Math.min(chunkSize, fileSize - offset);
+//       const chunkData = await RNFS.read(filePath, length, offset, "base64");
+//       const chunkBuffer = Buffer.from(chunkData, "base64");
+//       Logger.info(
+//         `Read chunk ${chunkIndex} for ${fileId}: ${chunkBuffer.length} bytes`
+//       );
+//       await chunkStorage.saveSentChunk(fileId, chunkIndex, chunkBuffer);
+
+//       const chunkIv = CryptoJS.lib.WordArray.random(16).toString(
+//         CryptoJS.enc.Hex
+//       );
+//       const encrypted = await encryptData(chunkBuffer, key, chunkIv);
+//       retries = 0;
+//       while (retries < MAX_RETRIES) {
+//         try {
+//           await new Promise<void>((resolve, reject) => {
+//             const timeout = setTimeout(() => {
+//               reject(
+//                 new DropShareError(
+//                   ERROR_CODES.NETWORK_ERROR,
+//                   `Timeout waiting for ACK_CHUNK ${chunkIndex} (attempt ${
+//                     retries + 1
+//                   })`
+//                 )
+//               );
+//             }, ACK_TIMEOUT);
+//             socket.once("data", (data) => {
+//               clearTimeout(timeout);
+//               const message = data.toString();
+//               Logger.info(`Received for ACK_CHUNK: ${message}`);
+//               if (
+//                 message.startsWith("ACK_CHUNK:") &&
+//                 message.includes(`${fileId}:${chunkIndex}`)
+//               ) {
+//                 resolve();
+//               } else {
+//                 reject(
+//                   new DropShareError(
+//                     ERROR_CODES.NETWORK_ERROR,
+//                     "Invalid ACK_CHUNK response"
+//                   )
+//                 );
+//               }
+//             });
+//             const chunkMessage = `CHUNK:${fileId}:${chunkIndex}:${chunkIv}:${encrypted.toString(
+//               "base64"
+//             )}\n`;
+//             Logger.info(
+//               `Sending CHUNK ${chunkIndex} for ${fileId}: ${chunkMessage.length} bytes`
+//             );
+//             socket.write(Buffer.from(chunkMessage), "base64", (err?: Error) => {
+//               if (err) {
+//                 Logger.error("Socket write error", err);
+//               }
+//             });
+//           });
+//           break;
+//         } catch (error) {
+//           retries++;
+//           if (retries === MAX_RETRIES) {
+//             throw error;
+//           }
+//           Logger.warn(
+//             `Retrying CHUNK ${chunkIndex} for ${fileId} after error ${error}`
+//           );
+//           await new Promise((resolve) => setTimeout(resolve, 1000));
+//         }
+//       }
+
+//       sentBytes += chunkBuffer.length;
+//       await chunkStorage.updateLastChunkIndex(fileId, chunkIndex);
+//       const elapsedTime = (Date.now() - startTime) / 1000 || 1;
+//       const speed = (sentBytes / elapsedTime / 1024).toFixed(2);
+//       setTransferProgress?.((prev) => [
+//         ...prev.filter((p) => p.fileId !== fileId),
+//         {
+//           fileId,
+//           fileName,
+//           progress: `${sentBytes}/${fileSize} bytes`,
+//           speed: `${speed} KB/s`,
+//           percentage: (sentBytes / fileSize) * 100,
+//         },
+//       ]);
+//       Logger.info(
+//         `Sent chunk ${chunkIndex} for ${fileId}, ${sentBytes}/${fileSize} bytes`
+//       );
+//       await new Promise((resolve) => setTimeout(resolve, 10)); // 10ms delay
+//     }
+
+//     Logger.info(`Sent file: ${fileName} from ${deviceName}`);
+//   } catch (error) {
+//     const err = error as Error;
+//     Logger.error(`Error in file transfer: ${err.message}`);
+//     socket.write(
+//       Buffer.from(
+//         `ERROR:${ERROR_CODES.NETWORK_ERROR}:Transfer failed: ${err.message}\n`
+//       )
+//     );
+//   }
+// }
+
+// export async function sendHostFile(
+//   server: TCPSocket.Server | null,
+//   filePath: string,
+//   fileData: Buffer,
+//   username: string,
+//   setTransferProgress?: React.Dispatch<React.SetStateAction<TransferProgress[]>>
+// ): Promise<void> {
+//   if (!server || connectedSockets.length === 0) {
+//     Logger.toast("No connected clients to send file", "error");
+//     return;
+//   }
+
+//   const fileName = filePath.split("/").pop() || "unknown";
+//   const senderIp = await getLocalIPAddress();
+//   const fileId = chunkStorage.generateFileId(fileName);
+//   const tempPath = `${RNFS.TemporaryDirectoryPath}/${fileId}`;
+//   await RNFS.writeFile(tempPath, fileData.toString("base64"), "base64");
+
+//   await Promise.all(
+//     connectedSockets.map((socket) =>
+//       sendFileInChunks(
+//         socket,
+//         fileName,
+//         tempPath,
+//         username,
+//         fileId,
+//         setTransferProgress
+//       )
+//     )
+//   );
+
+//   setTransferProgress?.((prev) => [
+//     ...prev.filter((p) => p.fileId !== fileId),
+//     {
+//       fileId,
+//       fileName,
+//       progress: `${fileData.length}/${fileData.length} bytes`,
+//       speed: "0 KB/s",
+//       percentage: 100,
+//     },
+//   ]);
+
+//   await RNFS.unlink(tempPath);
+//   Logger.info(`Sent file: ${fileName} from ${username} to all clients`);
+// }
+
+// export async function sendMultipleHostFiles(
+//   server: TCPSocket.Server | null,
+//   files: { filePath: string; fileData: Buffer }[],
+//   username: string,
+//   setTransferProgress?: React.Dispatch<React.SetStateAction<TransferProgress[]>>
+// ): Promise<void> {
+//   if (!server || connectedSockets.length === 0) {
+//     Logger.toast("No connected clients to send files", "error");
+//     return;
+//   }
+
+//   const fileTransfers = new Map<string, FileTransfer>();
+//   const queue: { filePath: string; fileData: Buffer }[] = [...files];
+
+//   while (queue.length > 0) {
+//     const { filePath, fileData } = queue.shift()!;
+//     const fileName = filePath.split("/").pop() || "unknown";
+//     const senderIp = await getLocalIPAddress();
+//     const fileId = chunkStorage.generateFileId(fileName);
+
+//     if (!checkTransferLimits(fileData.length, fileTransfers)) {
+//       Logger.toast(`Transfer limit exceeded for ${fileName}, queuing`, "warn");
+//       queue.unshift({ filePath, fileData });
+//       await new Promise((resolve) => setTimeout(resolve, 1000));
+//       continue;
+//     }
+
+//     const tempPath = `${RNFS.TemporaryDirectoryPath}/${fileId}`;
+//     await RNFS.writeFile(tempPath, fileData.toString("base64"), "base64");
+
+//     await Promise.all(
+//       connectedSockets.map((socket) =>
+//         sendFileInChunks(
+//           socket,
+//           fileName,
+//           tempPath,
+//           username,
+//           fileId,
+//           setTransferProgress
+//         )
+//       )
+//     );
+
+//     setTransferProgress?.((prev) => [
+//       ...prev.filter((p) => p.fileId !== fileId),
+//       {
+//         fileId,
+//         fileName,
+//         progress: `${fileData.length}/${fileData.length} bytes`,
+//         speed: "0 KB/s",
+//         percentage: 100,
+//       },
+//     ]);
+
+//     await RNFS.unlink(tempPath);
+//     Logger.info(`Sent file: ${fileName} from ${username} to all clients`);
+//   }
+// }
+
+// export function sendHostMessage(
+//   server: TCPSocket.Server | null,
+//   message: string,
+//   username: string
+// ): void {
+//   if (!server || connectedSockets.length === 0) {
+//     Logger.toast("No connected clients to send message", "error");
+//     return;
+//   }
+//   connectedSockets.forEach(async (socket) => {
+//     if (socket.sessionKey && socket.iv) {
+//       const iv = CryptoJS.lib.WordArray.random(16).toString(CryptoJS.enc.Hex);
+//       try {
+//         const encrypted = await encryptData(
+//           Buffer.from(`${username}: ${message}`),
+//           socket.sessionKey,
+//           iv
+//         );
+//         socket.write(
+//           Buffer.from(`MSG:${iv}:${encrypted.toString("base64")}\n`)
+//         );
+//         Logger.info(`Sent MSG to ${socket.remoteAddress}: ${message}`);
+//       } catch (error) {
+//         Logger.error(
+//           `Failed to encrypt and send message to ${socket.remoteAddress}`,
+//           error
+//         );
+//       }
+//     }
+//   });
+// }
+
+// export function stopHostServer(): void {
+//   Logger.info("Stopping host server...");
+//   isServerRunning = false;
+
+//   if (udpSocket) {
+//     udpSocket.close();
+//     udpSocket = null;
+//     Logger.info("UDP socket closed");
+//   }
+
+//   if (server) {
+//     server.close();
+//     server = null;
+//     Logger.info("TCP server closed");
+//   }
+
+//   connectedSockets.forEach((socket) => {
+//     socket.destroy();
+//     Logger.info(`Closed socket for ${socket.remoteAddress}`);
+//   });
+//   connectedSockets = [];
+//   Logger.info("Host server stopped");
+// }
+
+// export function kickClient(clientIp: string): void {
+//   const socket = connectedSockets.find((s) => s.remoteAddress === clientIp);
+//   if (!socket) {
+//     Logger.warn(`No client found with IP ${clientIp}`);
+//     return;
+//   }
+//   socket.end();
+//   connectedSockets = connectedSockets.filter(
+//     (s) => s.remoteAddress !== clientIp
+//   );
+//   Logger.toast(`Kicked client ${clientIp}`, "info");
+// }
+
+// import dgram from "react-native-udp";
+// import {
+//   getLocalIPAddress,
+//   getBroadcastIPAddress,
+//   calculateChunkSize,
+//   checkTransferLimits,
+// } from "../utils/networkUtils";
+// import RNFS from "react-native-fs";
+// import { Buffer } from "buffer";
+// import { chunkStorage } from "./ChunkStorage";
+// import { Logger } from "../utils/Logger";
+// import { DropShareError, ERROR_CODES } from "../utils/Error";
+// import TCPSocket from "react-native-tcp-socket";
+// import { generateAESKey, encryptData, decryptData } from "../utils/Crypto";
+// import CryptoJS from "crypto-js";
+
+// type UdpSocket = ReturnType<typeof dgram.createSocket>;
+
+// const UDP_PORT = 5000;
+// const TCP_PORT = 6000;
+// const ACK_TIMEOUT = 10000;
+// const MAX_CLIENTS = 5;
+// const MAX_RETRIES = 3;
+
+// interface ConnectedSocket extends TCPSocket.Socket {
+//   sessionKey?: string;
+//   iv?: string;
+// }
+// let connectedSockets: ConnectedSocket[] = [];
+// let isServerRunning = false;
+// let udpSocket: UdpSocket | null = null;
+// let server: TCPSocket.Server | null = null;
+
+// export async function startHostServer(
+//   username: string,
+//   setDevices: React.Dispatch<React.SetStateAction<Device[]>>,
+//   setSocket: React.Dispatch<React.SetStateAction<TCPSocket.Server | null>>,
+//   setMessages: React.Dispatch<React.SetStateAction<string[]>>,
+//   setReceivedFiles: React.Dispatch<React.SetStateAction<string[]>>,
+//   setTransferProgress?: React.Dispatch<React.SetStateAction<TransferProgress[]>>
+// ): Promise<void> {
+//   if (isServerRunning) {
+//     Logger.info("Host server already running, skipping start.");
+//     return;
+//   }
+//   isServerRunning = true;
+
+//   try {
+//     await chunkStorage.initialize();
+//     const ip = await getLocalIPAddress();
+//     const broadcastAddr = await getBroadcastIPAddress();
+//     Logger.info(`Host started on IP: ${ip}, Broadcasting to: ${broadcastAddr}`);
+
+//     udpSocket = dgram.createSocket({ type: "udp4" });
+//     udpSocket.bind(UDP_PORT);
+
+//     udpSocket.once("listening", () => {
+//       Logger.info(`UDP Socket bound to port ${UDP_PORT}`);
+//       udpSocket!.setBroadcast(true);
+//       const broadcastInterval = setInterval(() => {
+//         const message = JSON.stringify({ role: "Host", ip, name: username });
+//         udpSocket!.send(
+//           Buffer.from(message),
+//           0,
+//           message.length,
+//           UDP_PORT,
+//           broadcastAddr,
+//           (err) => {
+//             if (err) Logger.error("UDP Send Error", err);
+//           }
+//         );
+//       }, 2000);
+
+//       udpSocket!.on("close", () => clearInterval(broadcastInterval));
+//     });
+
+//     udpSocket.on("error", (err: Error) => {
+//       Logger.error("UDP Socket Error", err);
+//       isServerRunning = false;
+//       udpSocket?.close();
+//       udpSocket = null;
+//     });
+
+//     server = new TCPSocket.Server();
+//     server.on("connection", async (socket: ConnectedSocket) => {
+//       if (connectedSockets.length >= MAX_CLIENTS) {
+//         socket.write(Buffer.from(`ERROR:${ERROR_CODES.MAX_CLIENTS_REACHED}\n`));
+//         socket.destroy();
+//         Logger.warn("Max clients reached, rejecting new connection");
+//         return;
+//       }
+
+//       Logger.info(`Client connected: ${socket.remoteAddress}`);
+//       connectedSockets.push(socket);
+//       setSocket(server);
+//       setDevices((prev) => [
+//         ...prev.filter((d) => d.ip !== socket.remoteAddress),
+//         {
+//           ip: socket.remoteAddress || "Unknown",
+//           name: "Unknown",
+//           role: "Client",
+//         },
+//       ]);
+
+//       const fileTransfers = new Map<string, FileTransfer>();
+//       let buffer = Buffer.alloc(0);
+//       let inFileTransfer = false;
+
+//       const { key, iv } = await generateAESKey();
+//       socket.sessionKey = key;
+//       socket.iv = iv;
+//       socket.write(Buffer.from(`SESSION:${key}:${iv}\n`));
+//       Logger.info(
+//         `Sent SESSION key: ${key.slice(0, 10)}..., IV: ${iv.slice(
+//           0,
+//           10
+//         )}... to ${socket.remoteAddress}`
+//       );
+
+//       socket.on("data", async (data: string | Buffer) => {
+//         try {
+//           Logger.info(
+//             `Received data from ${socket.remoteAddress} (length: ${
+//               data.length
+//             }): ${data.toString().slice(0, 50)}...`
+//           );
+//           buffer = Buffer.concat([
+//             buffer,
+//             typeof data === "string" ? Buffer.from(data) : data,
+//           ]);
+//           Logger.info(`Buffer length: ${buffer.length}`);
+
+//           while (buffer.length > 0) {
+//             const dataStr = buffer.toString();
+//             const validPrefixes = [
+//               "FILE:",
+//               "CHUNK:",
+//               "MSG:",
+//               "CHECK_CHUNKS:",
+//               "ACK_START:",
+//               "ACK_CHUNKS:",
+//               "ACK_CHUNK:",
+//               "SESSION:",
+//               "ERROR:",
+//             ];
+//             const hasValidPrefix = validPrefixes.some((prefix) =>
+//               dataStr.startsWith(prefix)
+//             );
+
+//             if (!hasValidPrefix) {
+//               Logger.warn(
+//                 `Invalid data from ${socket.remoteAddress}: ${dataStr.slice(
+//                   0,
+//                   50
+//                 )}...`
+//               );
+//               socket.write(
+//                 Buffer.from(
+//                   `ERROR:${ERROR_CODES.INVALID_HEADER}:Invalid protocol\n`
+//                 )
+//               );
+//               buffer = Buffer.alloc(0);
+//               return;
+//             }
+
+//             if (!inFileTransfer) {
+//               if (dataStr.startsWith("FILE:")) {
+//                 const headerEnd = buffer.indexOf(Buffer.from("\n\n"));
+//                 if (headerEnd === -1) {
+//                   Logger.info(
+//                     `Incomplete FILE header from ${socket.remoteAddress}, waiting...`
+//                   );
+//                   return;
+//                 }
+//                 const headerStr = buffer.slice(5, headerEnd).toString();
+//                 Logger.info(`Received raw FILE header: ${headerStr}`);
+//                 let headerData: {
+//                   name: string;
+//                   size: number;
+//                   sender: string;
+//                   fileId: string;
+//                 };
+//                 try {
+//                   headerData = JSON.parse(headerStr);
+//                   Logger.info(
+//                     `Parsed FILE header: ${JSON.stringify(headerData)}`
+//                   );
+//                 } catch (error) {
+//                   Logger.error(
+//                     `Failed to parse FILE header: ${headerStr}`,
+//                     error
+//                   );
+//                   throw new DropShareError(
+//                     ERROR_CODES.INVALID_HEADER,
+//                     "Invalid file header"
+//                   );
+//                 }
+
+//                 const fileName = headerData.name;
+//                 const fileSize = headerData.size;
+//                 const deviceName = headerData.sender || "Unknown";
+//                 const fileId = headerData.fileId;
+
+//                 if (!fileName || !fileSize || !fileId) {
+//                   throw new DropShareError(
+//                     ERROR_CODES.INVALID_HEADER,
+//                     "Missing file name, size, or ID"
+//                   );
+//                 }
+
+//                 if (!checkTransferLimits(fileSize, fileTransfers)) {
+//                   socket.write(
+//                     Buffer.from(
+//                       `ERROR:${ERROR_CODES.TRANSFER_LIMIT_EXCEEDED}\n`
+//                     )
+//                   );
+//                   Logger.toast(
+//                     `Transfer limit exceeded for ${fileName}`,
+//                     "error"
+//                   );
+//                   buffer = Buffer.alloc(0);
+//                   return;
+//                 }
+
+//                 let transfer = fileTransfers.get(fileId);
+//                 let record = await chunkStorage.getTransferRecord(fileId);
+//                 let startChunkIndex = 0;
+
+//                 if (record && record.status !== "completed") {
+//                   startChunkIndex = record.lastChunkIndex + 1;
+//                   socket.write(
+//                     Buffer.from(
+//                       `ACK_START:${fileId}:${record.lastChunkIndex}\n`
+//                     )
+//                   );
+//                   Logger.info(
+//                     `Resuming transfer ${fileId} from chunk ${startChunkIndex}`
+//                   );
+//                 } else {
+//                   const chunkSize = calculateChunkSize(fileSize);
+//                   const totalChunks = Math.ceil(fileSize / chunkSize);
+//                   const { key, iv } = await generateAESKey();
+//                   Logger.info(
+//                     `Generated chunk AES key: ${key.slice(
+//                       0,
+//                       10
+//                     )}..., IV: ${iv.slice(0, 10)}... for ${fileId}`
+//                   );
+//                   record = {
+//                     fileId,
+//                     fileName,
+//                     totalSize: fileSize,
+//                     chunkSize,
+//                     lastChunkIndex: -1,
+//                     totalChunks,
+//                     status: "in_progress",
+//                     senderIp: socket.remoteAddress || "Unknown",
+//                     timestamp: Date.now(),
+//                     aesKey: key,
+//                     iv,
+//                     direction: "receiving",
+//                   };
+//                   try {
+//                     await chunkStorage.saveTransferRecord(record);
+//                   } catch (error) {
+//                     Logger.error(
+//                       `Failed to save transfer record for ${fileId}`,
+//                       error
+//                     );
+//                     socket.write(
+//                       Buffer.from(
+//                         `ERROR:${ERROR_CODES.DATABASE_WRITE_ERROR}:Failed to save transfer record\n`
+//                       )
+//                     );
+//                     buffer = Buffer.alloc(0);
+//                     throw error;
+//                   }
+//                   socket.write(Buffer.from(`ACK_START:${fileId}:-1\n`));
+//                   Logger.info(
+//                     `Started new transfer ${fileId} (${fileSize} bytes) from ${deviceName}`
+//                   );
+//                 }
+
+//                 if (!transfer) {
+//                   transfer = {
+//                     fileId,
+//                     fileName,
+//                     fileSize,
+//                     deviceName,
+//                     chunks: Array(record.totalChunks).fill(undefined),
+//                     receivedBytes: startChunkIndex * record.chunkSize,
+//                     startTime: Date.now(),
+//                     totalChunks: record.totalChunks,
+//                     chunkSize: record.chunkSize,
+//                     totalSize: fileSize,
+//                     senderIp: socket.remoteAddress || "Unknown",
+//                     chunkHashes: [],
+//                     status: "Receiving",
+//                     progress: 0,
+//                     lastChunkIndex: startChunkIndex - 1,
+//                   };
+//                   fileTransfers.set(fileId, transfer);
+//                 }
+
+//                 inFileTransfer = true;
+//                 buffer = buffer.slice(headerEnd + 2);
+//               } else if (dataStr.startsWith("CHECK_CHUNKS:")) {
+//                 Logger.info(`Processing CHECK_CHUNKS: ${dataStr}`);
+//                 const messageEnd = buffer.indexOf(Buffer.from("\n"));
+//                 if (messageEnd === -1) {
+//                   Logger.info(
+//                     `Incomplete CHECK_CHUNKS from ${socket.remoteAddress}, waiting...`
+//                   );
+//                   return;
+//                 }
+//                 const message = buffer.slice(0, messageEnd).toString();
+//                 const [, fileId, lastSentIndex] = message.split(":");
+//                 const record = await chunkStorage.getTransferRecord(fileId);
+//                 const lastReceivedIndex = record ? record.lastChunkIndex : -1;
+//                 socket.write(
+//                   Buffer.from(`ACK_CHUNKS:${fileId}:${lastReceivedIndex}\n`)
+//                 );
+//                 Logger.info(`Sent ACK_CHUNKS:${fileId}:${lastReceivedIndex}`);
+//                 buffer = buffer.slice(messageEnd + 1);
+//               } else if (dataStr.startsWith("MSG:")) {
+//                 const messageEnd = buffer.indexOf(Buffer.from("\n"));
+//                 if (messageEnd === -1) {
+//                   Logger.info(
+//                     `Incomplete MSG from ${socket.remoteAddress}, waiting...`
+//                   );
+//                   return;
+//                 }
+//                 const encryptedMsg = buffer.slice(4, messageEnd).toString();
+//                 const [iv, encrypted] = encryptedMsg.split(":");
+//                 const decrypted = await decryptData(
+//                   Buffer.from(encrypted, "base64"),
+//                   socket.sessionKey || "",
+//                   iv
+//                 );
+//                 const message = decrypted.toString();
+//                 Logger.info(`Decrypted MSG: ${message}`);
+//                 setMessages((prev) => [
+//                   ...prev,
+//                   `${socket.remoteAddress}: ${message}`,
+//                 ]);
+//                 connectedSockets
+//                   .filter((s) => s !== socket)
+//                   .forEach(async (s) => {
+//                     const newIv = CryptoJS.lib.WordArray.random(16).toString(
+//                       CryptoJS.enc.Hex
+//                     );
+//                     const reEncrypted = await encryptData(
+//                       Buffer.from(message),
+//                       s.sessionKey || "",
+//                       newIv
+//                     );
+//                     s.write(
+//                       Buffer.from(
+//                         `MSG:${newIv}:${reEncrypted.toString("base64")}\n`
+//                       )
+//                     );
+//                     Logger.info(`Forwarded MSG to ${s.remoteAddress}`);
+//                   });
+//                 buffer = buffer.slice(messageEnd + 1);
+//               } else if (dataStr.startsWith("CHUNK:")) {
+//                 const chunkEnd = buffer.indexOf(Buffer.from("\n"));
+//                 if (chunkEnd === -1) {
+//                   Logger.info(
+//                     `Incomplete CHUNK header from ${socket.remoteAddress}, waiting...`
+//                   );
+//                   return;
+//                 }
+//                 const chunkHeader = buffer.slice(0, chunkEnd).toString();
+//                 Logger.info(`Received CHUNK header: ${chunkHeader}`);
+//                 const [, fileId, chunkIndexStr, iv, encrypted] =
+//                   chunkHeader.split(":");
+//                 const chunkIndex = parseInt(chunkIndexStr);
+//                 const record = await chunkStorage.getTransferRecord(fileId);
+//                 if (!record) {
+//                   Logger.warn(`No record for ${fileId}, ignoring chunk`);
+//                   buffer = Buffer.alloc(0);
+//                   return;
+//                 }
+//                 Logger.info(
+//                   `Retrieved chunk AES key: ${record.aesKey?.slice(
+//                     0,
+//                     10
+//                   )}..., IV: ${iv.slice(0, 10)}... for ${fileId}`
+//                 );
+//                 let chunkData: Buffer;
+//                 try {
+//                   chunkData = await decryptData(
+//                     Buffer.from(encrypted, "base64"),
+//                     record.aesKey || "",
+//                     iv
+//                   );
+//                   Logger.info(
+//                     `Decrypted chunk ${chunkIndex} for ${fileId}: ${chunkData.length} bytes`
+//                   );
+//                 } catch (error) {
+//                   Logger.error(
+//                     `Failed to decrypt chunk ${chunkIndex} for ${fileId}`,
+//                     error
+//                   );
+//                   socket.write(
+//                     Buffer.from(
+//                       `ERROR:${ERROR_CODES.DECRYPTION_FAILED}:Decryption failed\n`
+//                     )
+//                   );
+//                   buffer = Buffer.alloc(0);
+//                   return;
+//                 }
+//                 const transfer = fileTransfers.get(fileId)!;
+//                 await chunkStorage.saveChunk(fileId, chunkIndex, chunkData);
+//                 transfer.chunks[chunkIndex] = chunkData;
+//                 transfer.receivedBytes += chunkData.length;
+//                 await chunkStorage.updateLastChunkIndex(fileId, chunkIndex);
+//                 socket.write(
+//                   Buffer.from(`ACK_CHUNK:${fileId}:${chunkIndex}\n`)
+//                 );
+//                 Logger.info(
+//                   `Sent ACK_CHUNK for ${fileId}:${chunkIndex}, ${transfer.receivedBytes}/${transfer.totalSize} bytes`
+//                 );
+
+//                 const elapsedTime =
+//                   (Date.now() - transfer.startTime) / 1000 || 1;
+//                 const speed = (
+//                   transfer.receivedBytes /
+//                   elapsedTime /
+//                   1024
+//                 ).toFixed(2);
+//                 const percentage =
+//                   (transfer.receivedBytes / transfer.totalSize) * 100;
+//                 setTransferProgress?.((prev) => [
+//                   ...prev.filter((p) => p.fileId !== fileId),
+//                   {
+//                     fileId,
+//                     fileName: transfer.fileName,
+//                     progress: `${transfer.receivedBytes}/${transfer.totalSize} bytes`,
+//                     speed: `${speed} KB/s`,
+//                     percentage,
+//                   },
+//                 ]);
+
+//                 if (transfer.receivedBytes >= transfer.totalSize) {
+//                   const savePath = await chunkStorage.assembleFile(
+//                     fileId,
+//                     transfer.fileName
+//                   );
+//                   setReceivedFiles((prev) => [...prev, savePath]);
+//                   Logger.info(
+//                     `Received and saved file: ${savePath} from ${transfer.deviceName}`
+//                   );
+//                   fileTransfers.delete(fileId);
+//                   inFileTransfer = false;
+//                 }
+//                 buffer = buffer.slice(chunkEnd + 1);
+//               } else if (
+//                 dataStr.startsWith("SESSION:") ||
+//                 dataStr.startsWith("ACK_START:") ||
+//                 dataStr.startsWith("ACK_CHUNKS:") ||
+//                 dataStr.startsWith("ACK_CHUNK:") ||
+//                 dataStr.startsWith("ERROR:")
+//               ) {
+//                 const messageEnd = buffer.indexOf(Buffer.from("\n"));
+//                 if (messageEnd === -1) {
+//                   Logger.info(
+//                     `Incomplete ${dataStr.slice(0, 10)} from ${
+//                       socket.remoteAddress
+//                     }, waiting...`
+//                   );
+//                   return;
+//                 }
+//                 Logger.info(`Processed ${dataStr.slice(0, messageEnd)}`);
+//                 buffer = buffer.slice(messageEnd + 1);
+//               } else {
+//                 Logger.warn(
+//                   `Unknown data from ${socket.remoteAddress}: ${dataStr.slice(
+//                     0,
+//                     50
+//                   )}...`
+//                 );
+//                 socket.write(
+//                   Buffer.from(
+//                     `ERROR:${ERROR_CODES.INVALID_HEADER}:Invalid protocol\n`
+//                   )
+//                 );
+//                 buffer = Buffer.alloc(0);
+//               }
+//             }
+//           }
+//         } catch (error) {
+//           Logger.error(
+//             `Error processing data from ${socket.remoteAddress}`,
+//             error
+//           );
+//           const err = DropShareError.from(
+//             error,
+//             ERROR_CODES.NETWORK_ERROR,
+//             "Data processing failed"
+//           );
+//           socket.write(Buffer.from(`ERROR:${err.code}:${err.message}\n`));
+//           buffer = Buffer.alloc(0);
+//           inFileTransfer = false;
+//           fileTransfers.clear();
+//         }
+//       });
+
+//       socket.on("close", () => {
+//         Logger.info(`Client disconnected: ${socket.remoteAddress}`);
+//         connectedSockets = connectedSockets.filter((s) => s !== socket);
+//         setDevices((prev) => prev.filter((d) => d.ip !== socket.remoteAddress));
+//       });
+
+//       socket.on("error", (err) => {
+//         Logger.error(`Host Socket Error for ${socket.remoteAddress}`, err);
+//       });
+//     });
+
+//     server.listen({ port: TCP_PORT, host: "0.0.0.0" }, () => {
+//       Logger.info(`Host TCP server running on port ${TCP_PORT}`);
+//     });
+
+//     server.on("error", (err) => {
+//       Logger.error("Server Error", err);
+//       stopHostServer();
+//     });
+
+//     server.on("close", () => {
+//       Logger.info("Host TCP server closed");
+//       isServerRunning = false;
+//     });
+//   } catch (err) {
+//     Logger.error("Failed to start host server", err);
+//     isServerRunning = false;
+//     stopHostServer();
+//   }
+// }
+
+// async function sendFileInChunks(
+//   socket: ConnectedSocket,
+//   fileName: string,
+//   filePath: string,
+//   deviceName: string,
+//   fileId: string,
+//   setTransferProgress?: React.Dispatch<React.SetStateAction<TransferProgress[]>>
+// ): Promise<void> {
+//   try {
+//     const fileSize = (await RNFS.stat(filePath)).size;
+//     const chunkSize = calculateChunkSize(fileSize);
+//     const totalChunks = Math.ceil(fileSize / chunkSize);
+//     const record = await chunkStorage.getTransferRecord(fileId);
+//     let lastSentChunkIndex = record ? record.lastChunkIndex : -1;
+
+//     let retries = 0;
+//     while (retries < MAX_RETRIES) {
+//       try {
+//         await new Promise<void>((resolve, reject) => {
+//           const timeout = setTimeout(() => {
+//             reject(
+//               new DropShareError(
+//                 ERROR_CODES.NETWORK_ERROR,
+//                 `Timeout waiting for ACK_CHUNKS (attempt ${retries + 1})`
+//               )
+//             );
+//           }, ACK_TIMEOUT);
+//           socket.once("data", (data) => {
+//             clearTimeout(timeout);
+//             const message = data.toString();
+//             Logger.info(`Received for CHECK_CHUNKS: ${message}`);
+//             if (message.startsWith("ACK_CHUNKS:")) {
+//               const [, ackFileId, lastReceivedIndex] = message.split(":");
+//               if (ackFileId === fileId) {
+//                 lastSentChunkIndex = Math.min(
+//                   parseInt(lastReceivedIndex),
+//                   lastSentChunkIndex
+//                 );
+//                 resolve();
+//               } else {
+//                 reject(
+//                   new DropShareError(
+//                     ERROR_CODES.INVALID_HEADER,
+//                     "Invalid ACK_CHUNKS response"
+//                   )
+//                 );
+//               }
+//             }
+//           });
+//           Logger.info(
+//             `Sending CHECK_CHUNKS (attempt ${
+//               retries + 1
+//             }): ${fileId}:${lastSentChunkIndex}`
+//           );
+//           socket.write(
+//             Buffer.from(`CHECK_CHUNKS:${fileId}:${lastSentChunkIndex}\n`)
+//           );
+//         });
+//         break;
+//       } catch (error) {
+//         retries++;
+//         if (retries === MAX_RETRIES) {
+//           throw error;
+//         }
+//         Logger.warn(`Retrying CHECK_CHUNKS for ${fileId} after error ${error}`);
+//         await new Promise((resolve) => setTimeout(resolve, 1000));
+//       }
+//     }
+
+//     const header = Buffer.from(
+//       `FILE:${JSON.stringify({
+//         name: fileName,
+//         size: fileSize,
+//         sender: deviceName,
+//         fileId,
+//       })}\n\n`
+//     );
+
+//     await new Promise<void>((resolve, reject) => {
+//       socket.write(header, "binary", (err) => (err ? reject(err) : resolve()));
+//     });
+//     Logger.info(`Sent header for ${fileId}: ${header.toString()}`);
+
+//     let sentBytes = (lastSentChunkIndex + 1) * chunkSize;
+//     const startTime = Date.now();
+//     const { key, iv } = await generateAESKey();
+//     Logger.info(
+//       `Generated chunk AES key: ${key.slice(0, 10)}..., IV: ${iv.slice(
+//         0,
+//         10
+//       )}... for ${fileId}`
+//     );
+
+//     if (!record) {
+//       try {
+//         await chunkStorage.saveTransferRecord({
+//           fileId,
+//           fileName,
+//           filePath,
+//           totalSize: fileSize,
+//           chunkSize,
+//           lastChunkIndex: -1,
+//           totalChunks,
+//           status: "in_progress",
+//           senderIp: await getLocalIPAddress(),
+//           timestamp: Date.now(),
+//           aesKey: key,
+//           iv,
+//           direction: "sending",
+//         });
+//       } catch (error) {
+//         Logger.error(`Failed to save transfer record for ${fileId}`, error);
+//         socket.write(
+//           Buffer.from(
+//             `ERROR:${ERROR_CODES.DATABASE_WRITE_ERROR}:Failed to save transfer record\n`
+//           )
+//         );
+//         throw error;
+//       }
+//     }
+
+//     for (
+//       let chunkIndex = lastSentChunkIndex + 1;
+//       chunkIndex < totalChunks;
+//       chunkIndex++
+//     ) {
+//       const offset = chunkIndex * chunkSize;
+//       const length = Math.min(chunkSize, fileSize - offset);
+//       const chunkData = await RNFS.read(filePath, length, offset, "base64");
+//       const chunkBuffer = Buffer.from(chunkData, "base64");
+//       Logger.info(
+//         `Read chunk ${chunkIndex} for ${fileId}: ${chunkBuffer.length} bytes`
+//       );
+//       await chunkStorage.saveSentChunk(fileId, chunkIndex, chunkBuffer);
+
+//       const chunkIv = CryptoJS.lib.WordArray.random(16).toString(
+//         CryptoJS.enc.Hex
+//       );
+//       const encrypted = await encryptData(chunkBuffer, key, chunkIv);
+//       retries = 0;
+//       while (retries < MAX_RETRIES) {
+//         try {
+//           await new Promise<void>((resolve, reject) => {
+//             const timeout = setTimeout(() => {
+//               reject(
+//                 new DropShareError(
+//                   ERROR_CODES.NETWORK_ERROR,
+//                   `Timeout waiting for ACK_CHUNK ${chunkIndex} (attempt ${
+//                     retries + 1
+//                   })`
+//                 )
+//               );
+//             }, ACK_TIMEOUT);
+//             socket.once("data", (data) => {
+//               clearTimeout(timeout);
+//               const message = data.toString();
+//               Logger.info(`Received for ACK_CHUNK: ${message}`);
+//               if (
+//                 message.startsWith("ACK_CHUNK:") &&
+//                 message.includes(`${fileId}:${chunkIndex}`)
+//               ) {
+//                 resolve();
+//               } else {
+//                 reject(
+//                   new DropShareError(
+//                     ERROR_CODES.NETWORK_ERROR,
+//                     "Invalid ACK_CHUNK response"
+//                   )
+//                 );
+//               }
+//             });
+//             const chunkMessage = `CHUNK:${fileId}:${chunkIndex}:${chunkIv}:${encrypted.toString(
+//               "base64"
+//             )}\n`;
+//             Logger.info(
+//               `Sending CHUNK ${chunkIndex} for ${fileId}: ${chunkMessage.length} bytes`
+//             );
+//             socket.write(Buffer.from(chunkMessage), "base64", (err) => {
+//               if (err) {
+//                 Logger.error("Socket write error", err);
+//               }
+//             });
+//           });
+//           break;
+//         } catch (error) {
+//           retries++;
+//           if (retries === MAX_RETRIES) {
+//             throw error;
+//           }
+//           Logger.warn(
+//             `Retrying CHUNK ${chunkIndex} for ${fileId} after error ${error}`
+//           );
+//           await new Promise((resolve) => setTimeout(resolve, 1000));
+//         }
+//       }
+
+//       sentBytes += chunkBuffer.length;
+//       await chunkStorage.updateLastChunkIndex(fileId, chunkIndex);
+//       const elapsedTime = (Date.now() - startTime) / 1000 || 1;
+//       const speed = (sentBytes / elapsedTime / 1024).toFixed(2);
+//       setTransferProgress?.((prev) => [
+//         ...prev.filter((p) => p.fileId !== fileId),
+//         {
+//           fileId,
+//           fileName,
+//           progress: `${sentBytes}/${fileSize} bytes`,
+//           speed: `${speed} KB/s`,
+//           percentage: (sentBytes / fileSize) * 100,
+//         },
+//       ]);
+//       Logger.info(
+//         `Sent chunk ${chunkIndex} for ${fileId}, ${sentBytes}/${fileSize} bytes`
+//       );
+//       await new Promise((resolve) => setTimeout(resolve, 10));
+//     }
+//   } catch (error) {
+//     Logger.error(`Error in file transfer for ${fileName}`, error);
+//     throw DropShareError.from(
+//       error,
+//       ERROR_CODES.NETWORK_ERROR,
+//       `Transfer failed: ${
+//         error instanceof Error ? error.message : "Unknown error"
+//       }`
+//     );
+//   }
+// }
+
+// export async function sendHostFile(
+//   server: TCPSocket.Server | null,
+//   filePath: string,
+//   fileData: Buffer,
+//   username: string,
+//   setTransferProgress?: React.Dispatch<React.SetStateAction<TransferProgress[]>>
+// ): Promise<void> {
+//   if (!server || connectedSockets.length === 0) {
+//     Logger.toast("No connected clients to send file", "error");
+//     return;
+//   }
+
+//   const fileName = filePath.split("/").pop() || "unknown";
+//   const senderIp = await getLocalIPAddress();
+//   const fileId = chunkStorage.generateFileId(fileName);
+//   const tempPath = `${RNFS.TemporaryDirectoryPath}/${fileId}`;
+//   await RNFS.writeFile(tempPath, fileData.toString("base64"), "base64");
+
+//   try {
+//     await Promise.all(
+//       connectedSockets.map((socket) =>
+//         sendFileInChunks(
+//           socket,
+//           fileName,
+//           tempPath,
+//           username,
+//           fileId,
+//           setTransferProgress
+//         )
+//       )
+//     );
+//     setTransferProgress?.((prev) => [
+//       ...prev.filter((p) => p.fileId !== fileId),
+//       {
+//         fileId,
+//         fileName,
+//         progress: `${fileData.length}/${fileData.length} bytes`,
+//         speed: "0 KB/s",
+//         percentage: 100,
+//       },
+//     ]);
+//     Logger.info(`Sent file: ${fileName} from ${username} to all clients`);
+//     Logger.toast(`Sent file ${fileName}`, "info");
+//   } catch (error) {
+//     Logger.error(`Failed to send file ${fileName}`, error);
+//     throw error;
+//   } finally {
+//     await RNFS.unlink(tempPath).catch((err) =>
+//       Logger.error(`Failed to delete temp file ${tempPath}`, err)
+//     );
+//   }
+// }
+
+// export async function sendMultipleHostFiles(
+//   server: TCPSocket.Server | null,
+//   files: { filePath: string; fileData: Buffer }[],
+//   username: string,
+//   setTransferProgress?: React.Dispatch<React.SetStateAction<TransferProgress[]>>
+// ): Promise<void> {
+//   if (!server || connectedSockets.length === 0) {
+//     Logger.toast("No connected clients to send files", "error");
+//     return;
+//   }
+
+//   const fileTransfers = new Map<string, FileTransfer>();
+//   const queue: { filePath: string; fileData: Buffer }[] = [...files];
+
+//   while (queue.length > 0) {
+//     const { filePath, fileData } = queue.shift()!;
+//     const fileName = filePath.split("/").pop() || "unknown";
+//     const senderIp = await getLocalIPAddress();
+//     const fileId = chunkStorage.generateFileId(fileName);
+
+//     if (!checkTransferLimits(fileData.length, fileTransfers)) {
+//       Logger.toast(`Transfer limit exceeded for ${fileName}, queuing`, "warn");
+//       queue.unshift({ filePath, fileData });
+//       await new Promise((resolve) => setTimeout(resolve, 1000));
+//       continue;
+//     }
+
+//     await sendHostFile(
+//       server,
+//       filePath,
+//       fileData,
+//       username,
+//       setTransferProgress
+//     );
+//     fileTransfers.set(fileId, {
+//       fileId,
+//       fileName,
+//       fileSize: fileData.length,
+//       deviceName: username,
+//       chunks: [],
+//       receivedBytes: fileData.length,
+//       startTime: Date.now(),
+//       totalChunks: Math.ceil(
+//         fileData.length / calculateChunkSize(fileData.length)
+//       ),
+//       chunkSize: calculateChunkSize(fileData.length),
+//       totalSize: fileData.length,
+//       senderIp,
+//       chunkHashes: [],
+//       status: "Completed",
+//       progress: 100,
+//       lastChunkIndex:
+//         Math.ceil(fileData.length / calculateChunkSize(fileData.length)) - 1,
+//     });
+//     Logger.info(`Sent file: ${fileName} from ${username}`);
+//   }
+// }
+
+// export function sendHostMessage(message: string, username: string): void {
+//   if (connectedSockets.length === 0) {
+//     Logger.toast("No connected clients to send message", "error");
+//     return;
+//   }
+
+//   connectedSockets.forEach(async (socket) => {
+//     if (socket.sessionKey && socket.iv) {
+//       const newIv = CryptoJS.lib.WordArray.random(16).toString(
+//         CryptoJS.enc.Hex
+//       );
+//       try {
+//         const encrypted = await encryptData(
+//           Buffer.from(`${username}: ${message}`),
+//           socket.sessionKey,
+//           newIv
+//         );
+//         socket.write(
+//           Buffer.from(`MSG:${newIv}:${encrypted.toString("base64")}\n`)
+//         );
+//         Logger.info(`Sent MSG to ${socket.remoteAddress}: ${message}`);
+//       } catch (error) {
+//         Logger.error(
+//           `Failed to encrypt and send message to ${socket.remoteAddress}`,
+//           error
+//         );
+//       }
+//     }
+//   });
+// }
+
+// export function stopHostServer(): void {
+//   Logger.info("Stopping host server...");
+//   connectedSockets.forEach((socket) => socket.destroy());
+//   connectedSockets = [];
+//   if (server) {
+//     server.close();
+//     server = null;
+//     Logger.info("Host TCP server stopped");
+//   }
+//   if (udpSocket) {
+//     udpSocket.close();
+//     udpSocket = null;
+//     Logger.info("Host UDP socket closed");
+//   }
+//   isServerRunning = false;
+// }
+
+// worked well for file transfer without chunks
+// import dgram from "react-native-udp";
+// import {
+//   getLocalIPAddress,
+//   getBroadcastIPAddress,
+//   checkTransferLimits,
+// } from "../utils/NetworkUtils";
+// import RNFS from "react-native-fs";
+// import { Buffer } from "buffer";
+// import { Logger } from "../utils/Logger";
+// import { DropShareError, ERROR_CODES } from "../utils/Error";
+// import TCPSocket from "react-native-tcp-socket";
+// import { savePath } from "../utils/FileSystemUtil";
+
+// type UdpSocket = ReturnType<typeof dgram.createSocket>;
+
+// const UDP_PORT = 5000;
+// const TCP_PORT = 6000;
+// const ACK_TIMEOUT = 10000;
+// const MAX_CLIENTS = 5;
+// const MAX_RETRIES = 3;
+
+// interface ConnectedSocket extends TCPSocket.Socket {}
+// let connectedSockets: ConnectedSocket[] = [];
+// let isServerRunning = false;
+// let udpSocket: UdpSocket | null = null;
+// let server: TCPSocket.Server | null = null;
+
+// export async function startHostServer(
+//   username: string,
+//   setDevices: React.Dispatch<React.SetStateAction<Device[]>>,
+//   setSocket: React.Dispatch<React.SetStateAction<TCPSocket.Server | null>>,
+//   setMessages: React.Dispatch<React.SetStateAction<string[]>>,
+//   setReceivedFiles: React.Dispatch<React.SetStateAction<string[]>>,
+//   setTransferProgress?: React.Dispatch<React.SetStateAction<TransferProgress[]>>
+// ): Promise<void> {
+//   if (isServerRunning) {
+//     Logger.info("Host server already running, skipping start.");
+//     return;
+//   }
+//   isServerRunning = true;
+
+//   try {
+//     const ip = await getLocalIPAddress();
+//     const broadcastAddr = await getBroadcastIPAddress();
+//     Logger.info(`Host started on IP: ${ip}, Broadcasting to: ${broadcastAddr}`);
+
+//     udpSocket = dgram.createSocket({ type: "udp4" });
+//     udpSocket.bind(UDP_PORT);
+
+//     udpSocket.once("listening", () => {
+//       Logger.info(`UDP Socket bound to port ${UDP_PORT}`);
+//       udpSocket!.setBroadcast(true);
+//       const broadcastInterval = setInterval(() => {
+//         const message = JSON.stringify({ role: "Host", ip, name: username });
+//         udpSocket!.send(
+//           Buffer.from(message),
+//           0,
+//           message.length,
+//           UDP_PORT,
+//           broadcastAddr,
+//           (err) => {
+//             if (err) Logger.error("UDP Send Error", err);
+//           }
+//         );
+//       }, 2000);
+
+//       udpSocket!.on("close", () => clearInterval(broadcastInterval));
+//     });
+
+//     udpSocket.on("error", (err: Error) => {
+//       Logger.error("UDP Socket Error", err);
+//       isServerRunning = false;
+//       udpSocket?.close();
+//       udpSocket = null;
+//     });
+
+//     server = new TCPSocket.Server();
+//     server.on("connection", (socket: ConnectedSocket) => {
+//       if (connectedSockets.length >= MAX_CLIENTS) {
+//         socket.write(Buffer.from(`ERROR:${ERROR_CODES.MAX_CLIENTS_REACHED}\n`));
+//         socket.destroy();
+//         Logger.warn("Max clients reached, rejecting new connection");
+//         return;
+//       }
+
+//       Logger.info(`Client connected: ${socket.remoteAddress}`);
+//       connectedSockets.push(socket);
+//       setSocket(server);
+//       setDevices((prev) => [
+//         ...prev.filter((d) => d.ip !== socket.remoteAddress),
+//         {
+//           ip: socket.remoteAddress || "Unknown",
+//           name: "Unknown",
+//           role: "Client",
+//         },
+//       ]);
+
+//       const fileTransfers = new Map<string, FileTransfer>();
+//       let buffer = Buffer.alloc(0);
+//       let receivingFile = false;
+//       let fileBuffer = Buffer.alloc(0);
+//       let fileId = "";
+//       let fileName = "";
+//       let fileSize = 0;
+//       let deviceName = "";
+//       let startTime = 0;
+
+//       socket.on("data", async (data: string | Buffer) => {
+//         try {
+//           if (receivingFile) {
+//             // Accumulate file data
+//             fileBuffer = Buffer.concat([
+//               fileBuffer,
+//               typeof data === "string" ? Buffer.from(data) : data,
+//             ]);
+
+//             const percentage = (fileBuffer.length / fileSize) * 100;
+//             const elapsedTime = (Date.now() - startTime) / 1000 || 1;
+//             const speed = (fileBuffer.length / elapsedTime / 1024).toFixed(2);
+
+//             setTransferProgress?.((prev) => [
+//               ...prev.filter((p) => p.fileId !== fileId),
+//               {
+//                 fileId,
+//                 fileName,
+//                 progress: `${fileBuffer.length}/${fileSize} bytes`,
+//                 speed: `${speed} KB/s`,
+//                 percentage,
+//               },
+//             ]);
+
+//             if (fileBuffer.length >= fileSize) {
+//               // File fully received
+//               await RNFS.writeFile(
+//                 `${savePath}/${fileName}`,
+//                 fileBuffer.toString("base64"),
+//                 "base64"
+//               );
+//               setReceivedFiles((prev) => [...prev, `${savePath}/${fileName}`]);
+//               Logger.info(
+//                 `Received and saved file: ${savePath} from ${deviceName}`
+//               );
+//               fileTransfers.delete(fileId);
+//               socket.write(Buffer.from(`ACK_COMPLETE:${fileId}\n`));
+//               receivingFile = false;
+//               fileBuffer = Buffer.alloc(0);
+//               fileId = "";
+//               fileName = "";
+//               fileSize = 0;
+//               deviceName = "";
+//             }
+//             return;
+//           }
+
+//           // Handle protocol messages
+//           buffer = Buffer.concat([
+//             buffer,
+//             typeof data === "string" ? Buffer.from(data) : data,
+//           ]);
+
+//           while (buffer.length > 0) {
+//             const dataStr = buffer.toString();
+//             if (dataStr.startsWith("FILE:")) {
+//               const headerEnd = buffer.indexOf(Buffer.from("\n\n"));
+//               if (headerEnd === -1) {
+//                 Logger.info(
+//                   `Incomplete FILE header from ${socket.remoteAddress}, waiting...`
+//                 );
+//                 return;
+//               }
+//               const headerStr = buffer.slice(5, headerEnd).toString();
+//               let headerData: {
+//                 name: string;
+//                 size: number;
+//                 sender: string;
+//                 fileId: string;
+//               };
+//               try {
+//                 headerData = JSON.parse(headerStr);
+//               } catch (error) {
+//                 Logger.error(
+//                   `Failed to parse FILE header: ${headerStr}`,
+//                   error
+//                 );
+//                 throw new DropShareError(
+//                   ERROR_CODES.INVALID_HEADER,
+//                   "Invalid file header"
+//                 );
+//               }
+
+//               fileName = headerData.name;
+//               fileSize = headerData.size;
+//               deviceName = headerData.sender || "Unknown";
+//               fileId = headerData.fileId;
+
+//               if (!fileName || !fileSize || !fileId) {
+//                 throw new DropShareError(
+//                   ERROR_CODES.INVALID_HEADER,
+//                   "Missing file name, size, or ID"
+//                 );
+//               }
+
+//               if (!checkTransferLimits(fileSize, fileTransfers)) {
+//                 socket.write(
+//                   Buffer.from(`ERROR:${ERROR_CODES.TRANSFER_LIMIT_EXCEEDED}\n`)
+//                 );
+//                 Logger.toast(
+//                   `Transfer limit exceeded for ${fileName}`,
+//                   "error"
+//                 );
+//                 buffer = Buffer.alloc(0);
+//                 return;
+//               }
+
+//               socket.write(Buffer.from(`ACK_FILE:${fileId}\n`));
+//               buffer = buffer.slice(headerEnd + 2);
+//               receivingFile = true;
+//               fileBuffer = Buffer.alloc(0);
+//               startTime = Date.now();
+//             } else if (dataStr.startsWith("MSG:")) {
+//               const messageEnd = buffer.indexOf(Buffer.from("\n"));
+//               if (messageEnd === -1) {
+//                 Logger.info(
+//                   `Incomplete MSG from ${socket.remoteAddress}, waiting...`
+//                 );
+//                 return;
+//               }
+//               const message = buffer.slice(4, messageEnd).toString();
+//               setMessages((prev) => [
+//                 ...prev,
+//                 `${socket.remoteAddress}: ${message}`,
+//               ]);
+//               connectedSockets
+//                 .filter((s) => s !== socket)
+//                 .forEach((s) => {
+//                   s.write(Buffer.from(`MSG:${message}\n`));
+//                   Logger.info(`Forwarded MSG to ${s.remoteAddress}`);
+//                 });
+//               buffer = buffer.slice(messageEnd + 1);
+//             } else if (
+//               dataStr.startsWith("ACK_FILE:") ||
+//               dataStr.startsWith("ACK_COMPLETE:")
+//             ) {
+//               const messageEnd = buffer.indexOf(Buffer.from("\n"));
+//               if (messageEnd === -1) {
+//                 Logger.info(
+//                   `Incomplete ${dataStr.slice(0, 10)} from ${
+//                     socket.remoteAddress
+//                   }, waiting...`
+//                 );
+//                 return;
+//               }
+//               Logger.info(`Processed ${dataStr.slice(0, messageEnd)}`);
+//               buffer = buffer.slice(messageEnd + 1);
+//             } else {
+//               Logger.warn(
+//                 `Invalid data from ${socket.remoteAddress}: ${dataStr.slice(
+//                   0,
+//                   50
+//                 )}...`
+//               );
+//               socket.write(
+//                 Buffer.from(
+//                   `ERROR:${ERROR_CODES.INVALID_HEADER}:Invalid protocol\n`
+//                 )
+//               );
+//               buffer = Buffer.alloc(0);
+//             }
+//           }
+//         } catch (error) {
+//           Logger.error(
+//             `Error processing data from ${socket.remoteAddress}`,
+//             error
+//           );
+//           const err = DropShareError.from(
+//             error,
+//             ERROR_CODES.NETWORK_ERROR,
+//             "Data processing failed"
+//           );
+//           socket.write(Buffer.from(`ERROR:${err.code}:${err.message}\n`));
+//           buffer = Buffer.alloc(0);
+//           receivingFile = false;
+//           fileBuffer = Buffer.alloc(0);
+//         }
+//       });
+
+//       socket.on("close", () => {
+//         Logger.info(`Client disconnected: ${socket.remoteAddress}`);
+//         connectedSockets = connectedSockets.filter((s) => s !== socket);
+//         setDevices((prev) => prev.filter((d) => d.ip !== socket.remoteAddress));
+//       });
+
+//       socket.on("error", (err) => {
+//         Logger.error(`Host Socket Error for ${socket.remoteAddress}`, err);
+//       });
+//     });
+
+//     server.listen({ port: TCP_PORT, host: "0.0.0.0" }, () => {
+//       Logger.info(`Host TCP server running on port ${TCP_PORT}`);
+//     });
+
+//     server.on("error", (err) => {
+//       Logger.error("Server Error", err);
+//       stopHostServer();
+//     });
+
+//     server.on("close", () => {
+//       Logger.info("Host TCP server closed");
+//       isServerRunning = false;
+//     });
+//   } catch (err) {
+//     Logger.error("Failed to start host server", err);
+//     isServerRunning = false;
+//     stopHostServer();
+//   }
+// }
+
+// async function sendFile(
+//   socket: ConnectedSocket,
+//   fileName: string,
+//   filePath: string,
+//   deviceName: string,
+//   fileId: string,
+//   setTransferProgress?: React.Dispatch<React.SetStateAction<TransferProgress[]>>
+// ): Promise<void> {
+//   try {
+//     const fileData = await RNFS.readFile(filePath, "base64");
+//     const fileBuffer = Buffer.from(fileData, "base64");
+//     const fileSize = fileBuffer.length;
+
+//     let retries = 0;
+//     while (retries < MAX_RETRIES) {
+//       try {
+//         await new Promise<void>((resolve, reject) => {
+//           const timeout = setTimeout(() => {
+//             reject(
+//               new DropShareError(
+//                 ERROR_CODES.NETWORK_ERROR,
+//                 `Timeout waiting for ACK_FILE (attempt ${retries + 1})`
+//               )
+//             );
+//           }, ACK_TIMEOUT);
+//           socket.once("data", (data) => {
+//             clearTimeout(timeout);
+//             const message = data.toString();
+//             Logger.info(`Received for ACK_FILE: ${message}`);
+//             if (message.startsWith(`ACK_FILE:${fileId}`)) {
+//               resolve();
+//             } else {
+//               reject(
+//                 new DropShareError(
+//                   ERROR_CODES.INVALID_HEADER,
+//                   `Invalid ACK_FILE response: ${message}`
+//                 )
+//               );
+//             }
+//           });
+//           const header = Buffer.from(
+//             `FILE:${JSON.stringify({
+//               name: fileName,
+//               size: fileSize,
+//               sender: deviceName,
+//               fileId,
+//             })}\n\n`
+//           );
+//           socket.write(header);
+//           Logger.info(`Sent header for ${fileId}: ${header.toString()}`);
+//         });
+
+//         const startTime = Date.now();
+//         await new Promise<void>((resolve, reject) => {
+//           socket.write(fileBuffer, "binary", (err) => {
+//             if (err) {
+//               reject(err);
+//             } else {
+//               Logger.info(`Sent file data for ${fileId}: ${fileSize} bytes`);
+//               resolve();
+//             }
+//           });
+//         });
+
+//         await new Promise<void>((resolve, reject) => {
+//           const timeout = setTimeout(() => {
+//             reject(
+//               new DropShareError(
+//                 ERROR_CODES.NETWORK_ERROR,
+//                 `Timeout waiting for ACK_COMPLETE (attempt ${retries + 1})`
+//               )
+//             );
+//           }, ACK_TIMEOUT);
+//           socket.once("data", (data) => {
+//             clearTimeout(timeout);
+//             const message = data.toString();
+//             Logger.info(`Received for ACK_COMPLETE: ${message}`);
+//             if (message.startsWith(`ACK_COMPLETE:${fileId}`)) {
+//               const elapsedTime = (Date.now() - startTime) / 1000 || 1;
+//               const speed = (fileSize / elapsedTime / 1024).toFixed(2);
+//               setTransferProgress?.((prev) => [
+//                 ...prev.filter((p) => p.fileId !== fileId),
+//                 {
+//                   fileId,
+//                   fileName,
+//                   progress: `${fileSize}/${fileSize} bytes`,
+//                   speed: `${speed} KB/s`,
+//                   percentage: 100,
+//                 },
+//               ]);
+//               resolve();
+//             } else {
+//               reject(
+//                 new DropShareError(
+//                   ERROR_CODES.NETWORK_ERROR,
+//                   `Invalid ACK_COMPLETE response: ${message}`
+//                 )
+//               );
+//             }
+//           });
+//         });
+//         break;
+//       } catch (error) {
+//         retries++;
+//         if (retries === MAX_RETRIES) {
+//           throw error;
+//         }
+//         Logger.warn(`Retrying file send for ${fileId} after error ${error}`);
+//         await new Promise((resolve) => setTimeout(resolve, 1000));
+//       }
+//     }
+//   } catch (error) {
+//     Logger.error(`Error in file transfer for ${fileName}`, error);
+//     throw DropShareError.from(
+//       error,
+//       ERROR_CODES.NETWORK_ERROR,
+//       `Transfer failed: ${
+//         error instanceof Error ? error.message : "Unknown error"
+//       }`
+//     );
+//   }
+// }
+
+// export async function sendHostFile(
+//   server: TCPSocket.Server | null,
+//   filePath: string,
+//   fileData: Buffer,
+//   username: string,
+//   setTransferProgress?: React.Dispatch<React.SetStateAction<TransferProgress[]>>
+// ): Promise<void> {
+//   if (!server || connectedSockets.length === 0) {
+//     Logger.toast("No connected clients to send file", "error");
+//     return;
+//   }
+
+//   const fileName = filePath.split("/").pop() || "unknown";
+//   const fileId = `${Date.now()}-${fileName}`;
+//   const tempPath = `${RNFS.TemporaryDirectoryPath}/${fileId}`;
+//   await RNFS.writeFile(tempPath, fileData.toString("base64"), "base64");
+
+//   try {
+//     await Promise.all(
+//       connectedSockets.map((socket) =>
+//         sendFile(
+//           socket,
+//           fileName,
+//           tempPath,
+//           username,
+//           fileId,
+//           setTransferProgress
+//         )
+//       )
+//     );
+//     Logger.info(`Sent file: ${fileName} from ${username} to all clients`);
+//     Logger.toast(`Sent file ${fileName}`, "info");
+//   } catch (error) {
+//     Logger.error(`Failed to send file ${fileName}`, error);
+//     throw error;
+//   } finally {
+//     await RNFS.unlink(tempPath).catch((err) =>
+//       Logger.error(`Failed to delete temp file ${tempPath}`, err)
+//     );
+//   }
+// }
+
+// export async function sendMultipleHostFiles(
+//   server: TCPSocket.Server | null,
+//   files: { filePath: string; fileData: Buffer }[],
+//   username: string,
+//   setTransferProgress?: React.Dispatch<React.SetStateAction<TransferProgress[]>>
+// ): Promise<void> {
+//   if (!server || connectedSockets.length === 0) {
+//     Logger.toast("No connected clients to send files", "error");
+//     return;
+//   }
+
+//   for (const { filePath, fileData } of files) {
+//     await sendHostFile(
+//       server,
+//       filePath,
+//       fileData,
+//       username,
+//       setTransferProgress
+//     );
+//     Logger.info(`Sent file: ${filePath.split("/").pop()} from ${username}`);
+//   }
+// }
+
+// export function sendHostMessage(message: string, username: string): void {
+//   if (connectedSockets.length === 0) {
+//     Logger.toast("No connected clients to send message", "error");
+//     return;
+//   }
+
+//   connectedSockets.forEach((socket) => {
+//     socket.write(Buffer.from(`MSG:${username}: ${message}\n`));
+//     Logger.info(`Sent MSG to ${socket.remoteAddress}: ${message}`);
+//   });
+// }
+
+// export function stopHostServer(): void {
+//   Logger.info("Stopping host server...");
+//   connectedSockets.forEach((socket) => socket.destroy());
+//   connectedSockets = [];
+//   if (server) {
+//     server.close();
+//     server = null;
+//     Logger.info("Host TCP server stopped");
+//   }
+//   if (udpSocket) {
+//     udpSocket.close();
+//     udpSocket = null;
+//     Logger.info("Host UDP socket closed");
+//   }
+//   isServerRunning = false;
+// }
+
+// worked well for file transfer with chunks but single file
+// import dgram from "react-native-udp";
+// import {
+//   getLocalIPAddress,
+//   getBroadcastIPAddress,
+//   checkTransferLimits,
+// } from "../utils/NetworkUtils";
+// import RNFS from "react-native-fs";
+// import { Buffer } from "buffer";
+// import { Logger } from "../utils/Logger";
+// import { DropShareError, ERROR_CODES } from "../utils/Error";
+// import TCPSocket from "react-native-tcp-socket";
+// import { savePath } from "../utils/FileSystemUtil";
+
+// type UdpSocket = ReturnType<typeof dgram.createSocket>;
+
+// const UDP_PORT = 5000;
+// const TCP_PORT = 6000;
+// const ACK_TIMEOUT = 10000;
+// const MAX_CLIENTS = 5;
+// const MAX_RETRIES = 3;
+// const CHUNK_SIZE = 1024 * 1024; // 1MB chunks
+
+// interface ConnectedSocket extends TCPSocket.Socket {}
+// let connectedSockets: ConnectedSocket[] = [];
+// let isServerRunning = false;
+// let udpSocket: UdpSocket | null = null;
+// let server: TCPSocket.Server | null = null;
+
+// export async function startHostServer(
+//   username: string,
+//   setDevices: React.Dispatch<React.SetStateAction<Device[]>>,
+//   setSocket: React.Dispatch<React.SetStateAction<TCPSocket.Server | null>>,
+//   setMessages: React.Dispatch<React.SetStateAction<string[]>>,
+//   setReceivedFiles: React.Dispatch<React.SetStateAction<string[]>>,
+//   setTransferProgress?: React.Dispatch<React.SetStateAction<TransferProgress[]>>
+// ): Promise<void> {
+//   if (isServerRunning) {
+//     Logger.info("Host server already running, skipping start.");
+//     return;
+//   }
+//   isServerRunning = true;
+
+//   try {
+//     const ip = await getLocalIPAddress();
+//     const broadcastAddr = await getBroadcastIPAddress();
+//     Logger.info(`Host started on IP: ${ip}, Broadcasting to: ${broadcastAddr}`);
+
+//     udpSocket = dgram.createSocket({ type: "udp4" });
+//     udpSocket.bind(UDP_PORT);
+
+//     udpSocket.once("listening", () => {
+//       Logger.info(`UDP Socket bound to port ${UDP_PORT}`);
+//       udpSocket!.setBroadcast(true);
+//       const broadcastInterval = setInterval(() => {
+//         const message = JSON.stringify({ role: "Host", ip, name: username });
+//         udpSocket!.send(
+//           Buffer.from(message),
+//           0,
+//           message.length,
+//           UDP_PORT,
+//           broadcastAddr,
+//           (err) => {
+//             if (err) Logger.error("UDP Send Error", err);
+//           }
+//         );
+//       }, 2000);
+
+//       udpSocket!.on("close", () => clearInterval(broadcastInterval));
+//     });
+
+//     udpSocket.on("error", (err: Error) => {
+//       Logger.error("UDP Socket Error", err);
+//       isServerRunning = false;
+//       udpSocket?.close();
+//       udpSocket = null;
+//     });
+
+//     server = new TCPSocket.Server();
+//     server.on("connection", (socket: ConnectedSocket) => {
+//       if (connectedSockets.length >= MAX_CLIENTS) {
+//         socket.write(Buffer.from(`ERROR:${ERROR_CODES.MAX_CLIENTS_REACHED}\n`));
+//         socket.destroy();
+//         Logger.warn("Max clients reached, rejecting new connection");
+//         return;
+//       }
+
+//       Logger.info(`Client connected: ${socket.remoteAddress}`);
+//       connectedSockets.push(socket);
+//       setSocket(server);
+//       setDevices((prev) => [
+//         ...prev.filter((d) => d.ip !== socket.remoteAddress),
+//         {
+//           ip: socket.remoteAddress || "Unknown",
+//           name: "Unknown",
+//           role: "Client",
+//         },
+//       ]);
+
+//       const fileTransfers = new Map<string, FileTransfer>();
+//       let buffer = Buffer.alloc(0);
+//       let receivingFile = false;
+//       let fileChunks: { [fileId: string]: Buffer[] } = {};
+//       let chunkCounts: { [fileId: string]: number } = {};
+//       let fileId = "";
+//       let fileName = "";
+//       let fileSize = 0;
+//       let deviceName = "";
+//       let startTime = 0;
+//       let totalChunks = 0;
+
+//       socket.on("data", async (data: string | Buffer) => {
+//         try {
+//           if (receivingFile) {
+//             buffer = Buffer.concat([
+//               buffer,
+//               typeof data === "string" ? Buffer.from(data) : data,
+//             ]);
+
+//             while (buffer.length > 0) {
+//               const dataStr = buffer.toString();
+//               if (dataStr.startsWith("CHUNK:")) {
+//                 const headerEnd = buffer.indexOf(Buffer.from("\n\n"));
+//                 if (headerEnd === -1) {
+//                   Logger.info(
+//                     `Incomplete CHUNK header from client, waiting...`
+//                   );
+//                   return;
+//                 }
+//                 const headerStr = buffer.slice(6, headerEnd).toString();
+//                 let chunkData: {
+//                   fileId: string;
+//                   chunkIndex: number;
+//                   chunkSize: number;
+//                 };
+//                 try {
+//                   chunkData = JSON.parse(headerStr);
+//                 } catch (error) {
+//                   Logger.error(
+//                     `Failed to parse CHUNK header: ${headerStr}`,
+//                     error
+//                   );
+//                   throw new DropShareError(
+//                     ERROR_CODES.INVALID_HEADER,
+//                     "Invalid chunk header"
+//                   );
+//                 }
+
+//                 const chunkSize = chunkData.chunkSize;
+//                 const expectedChunkEnd = headerEnd + 2 + chunkSize;
+
+//                 if (buffer.length < expectedChunkEnd) {
+//                   Logger.info(`Incomplete chunk data, waiting...`);
+//                   return;
+//                 }
+
+//                 const chunk = buffer.slice(headerEnd + 2, expectedChunkEnd);
+//                 if (!fileChunks[fileId]) {
+//                   fileChunks[fileId] = [];
+//                   chunkCounts[fileId] = 0;
+//                 }
+//                 fileChunks[fileId][chunkData.chunkIndex] = chunk;
+//                 chunkCounts[fileId]++;
+
+//                 const receivedBytes = Object.values(fileChunks[fileId]).reduce(
+//                   (sum, chunk) => sum + (chunk?.length || 0),
+//                   0
+//                 );
+//                 const percentage = (receivedBytes / fileSize) * 100;
+//                 const elapsedTime = (Date.now() - startTime) / 1000 || 1;
+//                 const speed = (receivedBytes / elapsedTime / 1024).toFixed(2);
+
+//                 setTransferProgress?.((prev) => [
+//                   ...prev.filter((p) => p.fileId !== fileId),
+//                   {
+//                     fileId,
+//                     fileName,
+//                     progress: `${receivedBytes}/${fileSize} bytes`,
+//                     speed: `${speed} KB/s`,
+//                     percentage,
+//                   },
+//                 ]);
+
+//                 socket.write(
+//                   Buffer.from(`ACK_CHUNK:${fileId}:${chunkData.chunkIndex}\n`)
+//                 );
+//                 buffer = buffer.slice(expectedChunkEnd);
+
+//                 if (chunkCounts[fileId] === totalChunks) {
+//                   // All chunks received, reconstruct file
+//                   const fileBuffer = Buffer.concat(
+//                     fileChunks[fileId].filter(Boolean)
+//                   );
+//                   await RNFS.writeFile(
+//                     `${savePath}/${fileName}`,
+//                     fileBuffer.toString("base64"),
+//                     "base64"
+//                   );
+//                   setReceivedFiles((prev) => [
+//                     ...prev,
+//                     `${savePath}/${fileName}`,
+//                   ]);
+//                   Logger.info(
+//                     `Received and saved file: ${savePath}/${fileName} from ${deviceName}`
+//                   );
+//                   fileTransfers.delete(fileId);
+//                   socket.write(Buffer.from(`ACK_COMPLETE:${fileId}\n`));
+//                   receivingFile = false;
+//                   delete fileChunks[fileId];
+//                   delete chunkCounts[fileId];
+//                   fileId = "";
+//                   fileName = "";
+//                   fileSize = 0;
+//                   deviceName = "";
+//                   totalChunks = 0;
+//                 }
+//               } else {
+//                 Logger.warn(
+//                   `Unexpected data while receiving file: ${dataStr.slice(
+//                     0,
+//                     50
+//                   )}...`
+//                 );
+//                 buffer = Buffer.alloc(0);
+//                 return;
+//               }
+//             }
+//             return;
+//           }
+
+//           // Handle protocol messages
+//           buffer = Buffer.concat([
+//             buffer,
+//             typeof data === "string" ? Buffer.from(data) : data,
+//           ]);
+
+//           while (buffer.length > 0) {
+//             const dataStr = buffer.toString();
+//             if (dataStr.startsWith("FILE:")) {
+//               const headerEnd = buffer.indexOf(Buffer.from("\n\n"));
+//               if (headerEnd === -1) {
+//                 Logger.info(
+//                   `Incomplete FILE header from ${socket.remoteAddress}, waiting...`
+//                 );
+//                 return;
+//               }
+//               const headerStr = buffer.slice(5, headerEnd).toString();
+//               let headerData: {
+//                 name: string;
+//                 size: number;
+//                 sender: string;
+//                 fileId: string;
+//                 totalChunks: number;
+//               };
+//               try {
+//                 headerData = JSON.parse(headerStr);
+//               } catch (error) {
+//                 Logger.error(
+//                   `Failed to parse FILE header: ${headerStr}`,
+//                   error
+//                 );
+//                 throw new DropShareError(
+//                   ERROR_CODES.INVALID_HEADER,
+//                   "Invalid file header"
+//                 );
+//               }
+
+//               fileName = headerData.name;
+//               fileSize = headerData.size;
+//               deviceName = headerData.sender || "Unknown";
+//               fileId = headerData.fileId;
+//               totalChunks = headerData.totalChunks;
+
+//               if (!fileName || !fileSize || !fileId || !totalChunks) {
+//                 throw new DropShareError(
+//                   ERROR_CODES.INVALID_HEADER,
+//                   "Missing file name, size, ID, or total chunks"
+//                 );
+//               }
+
+//               if (!checkTransferLimits(fileSize, fileTransfers)) {
+//                 socket.write(
+//                   Buffer.from(`ERROR:${ERROR_CODES.TRANSFER_LIMIT_EXCEEDED}\n`)
+//                 );
+//                 Logger.toast(
+//                   `Transfer limit exceeded for ${fileName}`,
+//                   "error"
+//                 );
+//                 buffer = Buffer.alloc(0);
+//                 return;
+//               }
+
+//               socket.write(Buffer.from(`ACK_FILE:${fileId}\n`));
+//               buffer = buffer.slice(headerEnd + 2);
+//               receivingFile = true;
+//               startTime = Date.now();
+//             } else if (dataStr.startsWith("MSG:")) {
+//               const messageEnd = buffer.indexOf(Buffer.from("\n"));
+//               if (messageEnd === -1) {
+//                 Logger.info(
+//                   `Incomplete MSG from ${socket.remoteAddress}, waiting...`
+//                 );
+//                 return;
+//               }
+//               const message = buffer.slice(4, messageEnd).toString();
+//               setMessages((prev) => [
+//                 ...prev,
+//                 `${socket.remoteAddress}: ${message}`,
+//               ]);
+//               connectedSockets
+//                 .filter((s) => s !== socket)
+//                 .forEach((s) => {
+//                   s.write(Buffer.from(`MSG:${message}\n`));
+//                   Logger.info(`Forwarded MSG to ${s.remoteAddress}`);
+//                 });
+//               buffer = buffer.slice(messageEnd + 1);
+//             } else if (
+//               dataStr.startsWith("ACK_FILE:") ||
+//               dataStr.startsWith("ACK_COMPLETE:") ||
+//               dataStr.startsWith("ACK_CHUNK:")
+//             ) {
+//               const messageEnd = buffer.indexOf(Buffer.from("\n"));
+//               if (messageEnd === -1) {
+//                 Logger.info(
+//                   `Incomplete ${dataStr.slice(0, 10)} from ${
+//                     socket.remoteAddress
+//                   }, waiting...`
+//                 );
+//                 return;
+//               }
+//               Logger.info(`Processed ${dataStr.slice(0, messageEnd)}`);
+//               buffer = buffer.slice(messageEnd + 1);
+//             } else {
+//               Logger.warn(
+//                 `Invalid data from ${socket.remoteAddress}: ${dataStr.slice(
+//                   0,
+//                   50
+//                 )}...`
+//               );
+//               socket.write(
+//                 Buffer.from(
+//                   `ERROR:${ERROR_CODES.INVALID_HEADER}:Invalid protocol\n`
+//                 )
+//               );
+//               buffer = Buffer.alloc(0);
+//             }
+//           }
+//         } catch (error) {
+//           Logger.error(
+//             `Error processing data from ${socket.remoteAddress}`,
+//             error
+//           );
+//           const err = DropShareError.from(
+//             error,
+//             ERROR_CODES.NETWORK_ERROR,
+//             "Data processing failed"
+//           );
+//           socket.write(Buffer.from(`ERROR:${err.code}:${err.message}\n`));
+//           buffer = Buffer.alloc(0);
+//           receivingFile = false;
+//           fileChunks = {};
+//           chunkCounts = {};
+//         }
+//       });
+
+//       socket.on("close", () => {
+//         Logger.info(`Client disconnected: ${socket.remoteAddress}`);
+//         connectedSockets = connectedSockets.filter((s) => s !== socket);
+//         setDevices((prev) => prev.filter((d) => d.ip !== socket.remoteAddress));
+//       });
+
+//       socket.on("error", (err) => {
+//         Logger.error(`Host Socket Error for ${socket.remoteAddress}`, err);
+//       });
+//     });
+
+//     server.listen({ port: TCP_PORT, host: "0.0.0.0" }, () => {
+//       Logger.info(`Host TCP server running on port ${TCP_PORT}`);
+//     });
+
+//     server.on("error", (err) => {
+//       Logger.error("Server Error", err);
+//       stopHostServer();
+//     });
+
+//     server.on("close", () => {
+//       Logger.info("Host TCP server closed");
+//       isServerRunning = false;
+//     });
+//   } catch (err) {
+//     Logger.error("Failed to start host server", err);
+//     isServerRunning = false;
+//     stopHostServer();
+//   }
+// }
+
+// async function sendFile(
+//   socket: ConnectedSocket,
+//   fileName: string,
+//   filePath: string,
+//   deviceName: string,
+//   fileId: string,
+//   setTransferProgress?: React.Dispatch<React.SetStateAction<TransferProgress[]>>
+// ): Promise<void> {
+//   try {
+//     const fileData = await RNFS.readFile(filePath, "base64");
+//     const fileBuffer = Buffer.from(fileData, "base64");
+//     const fileSize = fileBuffer.length;
+//     const totalChunks = Math.ceil(fileSize / CHUNK_SIZE);
+
+//     let retries = 0;
+//     while (retries < MAX_RETRIES) {
+//       try {
+//         // Send file header
+//         await new Promise<void>((resolve, reject) => {
+//           const timeout = setTimeout(() => {
+//             reject(
+//               new DropShareError(
+//                 ERROR_CODES.NETWORK_ERROR,
+//                 `Timeout waiting for ACK_FILE (attempt ${retries + 1})`
+//               )
+//             );
+//           }, ACK_TIMEOUT);
+//           socket.once("data", (data) => {
+//             clearTimeout(timeout);
+//             const message = data.toString();
+//             Logger.info(`Received for ACK_FILE: ${message}`);
+//             if (message.startsWith(`ACK_FILE:${fileId}`)) {
+//               resolve();
+//             } else {
+//               reject(
+//                 new DropShareError(
+//                   ERROR_CODES.INVALID_HEADER,
+//                   `Invalid ACK_FILE response: ${message}`
+//                 )
+//               );
+//             }
+//           });
+//           const header = Buffer.from(
+//             `FILE:${JSON.stringify({
+//               name: fileName,
+//               size: fileSize,
+//               sender: deviceName,
+//               fileId,
+//               totalChunks,
+//             })}\n\n`
+//           );
+//           socket.write(header);
+//           Logger.info(`Sent header for ${fileId}: ${header.toString()}`);
+//         });
+
+//         const startTime = Date.now();
+//         let sentBytes = 0;
+
+//         // Send chunks
+//         for (let i = 0; i < totalChunks; i++) {
+//           const start = i * CHUNK_SIZE;
+//           const chunk = fileBuffer.slice(start, start + CHUNK_SIZE);
+//           const chunkSize = chunk.length;
+
+//           await new Promise<void>((resolve, reject) => {
+//             const timeout = setTimeout(() => {
+//               reject(
+//                 new DropShareError(
+//                   ERROR_CODES.NETWORK_ERROR,
+//                   `Timeout waiting for ACK_CHUNK:${i} (attempt ${retries + 1})`
+//                 )
+//               );
+//             }, ACK_TIMEOUT);
+//             socket.once("data", (data) => {
+//               clearTimeout(timeout);
+//               const message = data.toString();
+//               Logger.info(`Received for ACK_CHUNK:${i}: ${message}`);
+//               if (message.startsWith(`ACK_CHUNK:${fileId}:${i}`)) {
+//                 resolve();
+//               } else {
+//                 reject(
+//                   new DropShareError(
+//                     ERROR_CODES.INVALID_HEADER,
+//                     `Invalid ACK_CHUNK response: ${message}`
+//                   )
+//                 );
+//               }
+//             });
+//             const chunkHeader = Buffer.from(
+//               `CHUNK:${JSON.stringify({
+//                 fileId,
+//                 chunkIndex: i,
+//                 chunkSize,
+//               })}\n\n`
+//             );
+//             socket.write(Buffer.concat([chunkHeader, chunk]));
+//             Logger.info(`Sent chunk ${i}/${totalChunks} for ${fileId}`);
+//           });
+
+//           sentBytes += chunkSize;
+//           const percentage = (sentBytes / fileSize) * 100;
+//           const elapsedTime = (Date.now() - startTime) / 1000 || 1;
+//           const speed = (sentBytes / elapsedTime / 1024).toFixed(2);
+
+//           setTransferProgress?.((prev) => [
+//             ...prev.filter((p) => p.fileId !== fileId),
+//             {
+//               fileId,
+//               fileName,
+//               progress: `${sentBytes}/${fileSize} bytes`,
+//               speed: `${speed} KB/s`,
+//               percentage,
+//             },
+//           ]);
+//         }
+
+//         // Wait for final ACK
+//         await new Promise<void>((resolve, reject) => {
+//           const timeout = setTimeout(() => {
+//             reject(
+//               new DropShareError(
+//                 ERROR_CODES.NETWORK_ERROR,
+//                 `Timeout waiting for ACK_COMPLETE (attempt ${retries + 1})`
+//               )
+//             );
+//           }, ACK_TIMEOUT);
+//           socket.once("data", (data) => {
+//             clearTimeout(timeout);
+//             const message = data.toString();
+//             Logger.info(`Received for ACK_COMPLETE: ${message}`);
+//             if (message.startsWith(`ACK_COMPLETE:${fileId}`)) {
+//               const elapsedTime = (Date.now() - startTime) / 1000 || 1;
+//               const speed = (fileSize / elapsedTime / 1024).toFixed(2);
+//               setTransferProgress?.((prev) => [
+//                 ...prev.filter((p) => p.fileId !== fileId),
+//                 {
+//                   fileId,
+//                   fileName,
+//                   progress: `${fileSize}/${fileSize} bytes`,
+//                   speed: `${speed} KB/s`,
+//                   percentage: 100,
+//                 },
+//               ]);
+//               resolve();
+//             } else {
+//               reject(
+//                 new DropShareError(
+//                   ERROR_CODES.NETWORK_ERROR,
+//                   `Invalid ACK_COMPLETE response: ${message}`
+//                 )
+//               );
+//             }
+//           });
+//         });
+//         break;
+//       } catch (error) {
+//         retries++;
+//         if (retries === MAX_RETRIES) {
+//           throw error;
+//         }
+//         Logger.warn(`Retrying file send for ${fileId} after error ${error}`);
+//         await new Promise((resolve) => setTimeout(resolve, 1000));
+//       }
+//     }
+//   } catch (error) {
+//     Logger.error(`Error in file transfer for ${fileName}`, error);
+//     throw DropShareError.from(
+//       error,
+//       ERROR_CODES.NETWORK_ERROR,
+//       `Transfer failed: ${
+//         error instanceof Error ? error.message : "Unknown error"
+//       }`
+//     );
+//   }
+// }
+
+// export async function sendHostFile(
+//   server: TCPSocket.Server | null,
+//   filePath: string,
+//   fileData: Buffer,
+//   username: string,
+//   setTransferProgress?: React.Dispatch<React.SetStateAction<TransferProgress[]>>
+// ): Promise<void> {
+//   if (!server || connectedSockets.length === 0) {
+//     Logger.toast("No connected clients to send file", "error");
+//     return;
+//   }
+
+//   const fileName = filePath.split("/").pop() || "unknown";
+//   const fileId = `${Date.now()}-${fileName}`;
+//   const tempPath = `${RNFS.TemporaryDirectoryPath}/${fileId}`;
+//   await RNFS.writeFile(tempPath, fileData.toString("base64"), "base64");
+
+//   try {
+//     await Promise.all(
+//       connectedSockets.map((socket) =>
+//         sendFile(
+//           socket,
+//           fileName,
+//           tempPath,
+//           username,
+//           fileId,
+//           setTransferProgress
+//         )
+//       )
+//     );
+//     Logger.info(`Sent file: ${fileName} from ${username} to all clients`);
+//     Logger.toast(`Sent file ${fileName}`, "info");
+//   } catch (error) {
+//     Logger.error(`Failed to send file ${fileName}`, error);
+//     throw error;
+//   } finally {
+//     await RNFS.unlink(tempPath).catch((err) =>
+//       Logger.error(`Failed to delete temp file ${tempPath}`, err)
+//     );
+//   }
+// }
+
+// export async function sendMultipleHostFiles(
+//   server: TCPSocket.Server | null,
+//   files: { filePath: string; fileData: Buffer }[],
+//   username: string,
+//   setTransferProgress?: React.Dispatch<React.SetStateAction<TransferProgress[]>>
+// ): Promise<void> {
+//   if (!server || connectedSockets.length === 0) {
+//     Logger.toast("No connected clients to send files", "error");
+//     return;
+//   }
+
+//   for (const { filePath, fileData } of files) {
+//     await sendHostFile(
+//       server,
+//       filePath,
+//       fileData,
+//       username,
+//       setTransferProgress
+//     );
+//     Logger.info(`Sent file: ${filePath.split("/").pop()} from ${username}`);
+//   }
+// }
+
+// export function sendHostMessage(message: string, username: string): void {
+//   if (connectedSockets.length === 0) {
+//     Logger.toast("No connected clients to send message", "error");
+//     return;
+//   }
+
+//   connectedSockets.forEach((socket) => {
+//     socket.write(Buffer.from(`MSG:${username}: ${message}\n`));
+//     Logger.info(`Sent MSG to ${socket.remoteAddress}: ${message}`);
+//   });
+// }
+
+// export function stopHostServer(): void {
+//   Logger.info("Stopping host server...");
+//   connectedSockets.forEach((socket) => socket.destroy());
+//   connectedSockets = [];
+//   if (server) {
+//     server.close();
+//     server = null;
+//     Logger.info("Host TCP server stopped");
+//   }
+//   if (udpSocket) {
+//     udpSocket.close();
+//     udpSocket = null;
+//     Logger.info("Host UDP socket closed");
+//   }
+//   isServerRunning = false;
+// }
+
 import dgram from "react-native-udp";
 import {
   getLocalIPAddress,
   getBroadcastIPAddress,
-  calculateChunkSize,
   checkTransferLimits,
-} from "../utils/networkUtils";
+  calculateChunkSize,
+} from "../utils/NetworkUtils";
 import RNFS from "react-native-fs";
 import { Buffer } from "buffer";
 import { Logger } from "../utils/Logger";
 import { DropShareError, ERROR_CODES } from "../utils/Error";
 import TCPSocket from "react-native-tcp-socket";
+import { savePath } from "../utils/FileSystemUtil";
 
 type UdpSocket = ReturnType<typeof dgram.createSocket>;
 
 const UDP_PORT = 5000;
 const TCP_PORT = 6000;
-const ACK_TIMEOUT = 5000;
+const ACK_TIMEOUT = 10000;
 const MAX_CLIENTS = 5;
+const MAX_RETRIES = 3;
 
 interface ConnectedSocket extends TCPSocket.Socket {}
-
-interface FileTransfer {
-  fileId: string;
-  fileName: string;
-  fileSize: number;
-  deviceName: string;
-  chunks: (Buffer | undefined)[];
-  receivedBytes: number;
-  startTime: number;
-  totalChunks: number;
-  chunkSize: number;
-  totalSize: number;
-  senderIp: string;
-  status: "Receiving" | "Sending" | "Completed";
-  progress: number;
-  lastChunkIndex: number;
-  chunkHashes: string[];
-}
-
 let connectedSockets: ConnectedSocket[] = [];
 let isServerRunning = false;
 let udpSocket: UdpSocket | null = null;
 let server: TCPSocket.Server | null = null;
-const TRANSFER_QUEUE: {
-  socket: ConnectedSocket;
-  fileId: string;
-  chunkIndex: number;
-}[] = [];
 
 export async function startHostServer(
   username: string,
@@ -1872,7 +4896,7 @@ export async function startHostServer(
     });
 
     server = new TCPSocket.Server();
-    server.on("connection", async (socket: ConnectedSocket) => {
+    server.on("connection", (socket: ConnectedSocket) => {
       if (connectedSockets.length >= MAX_CLIENTS) {
         socket.write(Buffer.from(`ERROR:${ERROR_CODES.MAX_CLIENTS_REACHED}\n`));
         socket.destroy();
@@ -1894,10 +4918,159 @@ export async function startHostServer(
 
       const fileTransfers = new Map<string, FileTransfer>();
       let buffer = Buffer.alloc(0);
-      let inFileTransfer = false;
+      let receivingFile = false;
+      let fileChunks: { [fileId: string]: Buffer[] } = {};
+      let chunkCounts: { [fileId: string]: number } = {};
+      let fileId = "";
+      let fileName = "";
+      let fileSize = 0;
+      let deviceName = "";
+      let startTime = 0;
+      let totalChunks = 0;
+      let expectedChunkSize = 0;
 
       socket.on("data", async (data: string | Buffer) => {
         try {
+          if (receivingFile) {
+            buffer = Buffer.concat([
+              buffer,
+              typeof data === "string" ? Buffer.from(data) : data,
+            ]);
+
+            while (buffer.length > 0) {
+              const dataStr = buffer.toString();
+              if (dataStr.startsWith("CHUNK:")) {
+                const headerEnd = buffer.indexOf(Buffer.from("\n\n"));
+                if (headerEnd === -1) {
+                  Logger.info(
+                    `Incomplete CHUNK header from client, waiting...`
+                  );
+                  return;
+                }
+                const headerStr = buffer.slice(6, headerEnd).toString();
+                let chunkData: {
+                  fileId: string;
+                  chunkIndex: number;
+                  chunkSize: number;
+                };
+                try {
+                  chunkData = JSON.parse(headerStr);
+                } catch (error) {
+                  Logger.error(
+                    `Failed to parse CHUNK header: ${headerStr}`,
+                    error
+                  );
+                  throw new DropShareError(
+                    ERROR_CODES.INVALID_HEADER,
+                    "Invalid chunk header"
+                  );
+                }
+
+                const chunkSize = chunkData.chunkSize;
+                const expectedChunkEnd = headerEnd + 2 + chunkSize;
+
+                if (buffer.length < expectedChunkEnd) {
+                  Logger.info(
+                    `Incomplete chunk data for ${chunkData.fileId}, waiting...`
+                  );
+                  return;
+                }
+
+                const chunk = buffer.slice(headerEnd + 2, expectedChunkEnd);
+                if (chunk.length !== chunkSize) {
+                  Logger.error(
+                    `Chunk size mismatch for ${chunkData.fileId}: expected ${chunkSize}, received ${chunk.length}`
+                  );
+                  throw new DropShareError(
+                    ERROR_CODES.CORRUPTED_CHUNK,
+                    `Chunk size mismatch: expected ${chunkSize}, received ${chunk.length}`
+                  );
+                }
+
+                if (!fileChunks[fileId]) {
+                  fileChunks[fileId] = [];
+                  chunkCounts[fileId] = 0;
+                }
+                fileChunks[fileId][chunkData.chunkIndex] = chunk;
+                chunkCounts[fileId]++;
+
+                const receivedBytes = Object.values(fileChunks[fileId]).reduce(
+                  (sum, chunk) => sum + (chunk?.length || 0),
+                  0
+                );
+                const percentage = (receivedBytes / fileSize) * 100;
+                const elapsedTime = (Date.now() - startTime) / 1000 || 1;
+                const speed = (receivedBytes / elapsedTime / 1024).toFixed(2);
+
+                setTransferProgress?.((prev) => [
+                  ...prev.filter((p) => p.fileId !== fileId),
+                  {
+                    fileId,
+                    fileName,
+                    progress: `${receivedBytes}/${fileSize} bytes`,
+                    speed: `${speed} KB/s`,
+                    percentage,
+                  },
+                ]);
+
+                socket.write(
+                  Buffer.from(`ACK_CHUNK:${fileId}:${chunkData.chunkIndex}\n`)
+                );
+                buffer = buffer.slice(expectedChunkEnd);
+
+                if (chunkCounts[fileId] === totalChunks) {
+                  // All chunks received, reconstruct file
+                  const fileBuffer = Buffer.concat(
+                    fileChunks[fileId].filter(Boolean)
+                  );
+                  if (fileBuffer.length !== fileSize) {
+                    Logger.error(
+                      `File size mismatch for ${fileId}: expected ${fileSize}, received ${fileBuffer.length}`
+                    );
+                    throw new DropShareError(
+                      ERROR_CODES.CORRUPTED_CHUNK,
+                      `File size mismatch: expected ${fileSize}, received ${fileBuffer.length}`
+                    );
+                  }
+                  await RNFS.writeFile(
+                    `${savePath}/${fileName}`,
+                    fileBuffer.toString("base64"),
+                    "base64"
+                  );
+                  setReceivedFiles((prev) => [
+                    ...prev,
+                    `${savePath}/${fileName}`,
+                  ]);
+                  Logger.info(
+                    `Received and saved file: ${savePath}/${fileName} from ${deviceName}`
+                  );
+                  fileTransfers.delete(fileId);
+                  socket.write(Buffer.from(`ACK_COMPLETE:${fileId}\n`));
+                  receivingFile = false;
+                  delete fileChunks[fileId];
+                  delete chunkCounts[fileId];
+                  fileId = "";
+                  fileName = "";
+                  fileSize = 0;
+                  deviceName = "";
+                  totalChunks = 0;
+                  expectedChunkSize = 0;
+                }
+              } else {
+                Logger.warn(
+                  `Unexpected data while receiving file: ${dataStr.slice(
+                    0,
+                    50
+                  )}...`
+                );
+                buffer = Buffer.alloc(0);
+                return;
+              }
+            }
+            return;
+          }
+
+          // Handle protocol messages
           buffer = Buffer.concat([
             buffer,
             typeof data === "string" ? Buffer.from(data) : data,
@@ -1905,15 +5078,120 @@ export async function startHostServer(
 
           while (buffer.length > 0) {
             const dataStr = buffer.toString();
-            const validPrefixes = [
-              "FILE:",
-              "CHUNK:",
-              "MSG:",
-              "ACK_START:",
-              "ACK_CHUNK:",
-              "ERROR:",
-            ];
-            if (!validPrefixes.some((prefix) => dataStr.startsWith(prefix))) {
+            if (dataStr.startsWith("FILE:")) {
+              const headerEnd = buffer.indexOf(Buffer.from("\n\n"));
+              if (headerEnd === -1) {
+                Logger.info(
+                  `Incomplete FILE header from ${socket.remoteAddress}, waiting...`
+                );
+                return;
+              }
+              const headerStr = buffer.slice(5, headerEnd).toString();
+              let headerData: {
+                name: string;
+                size: number;
+                sender: string;
+                fileId: string;
+                totalChunks: number;
+                chunkSize: number;
+              };
+              try {
+                headerData = JSON.parse(headerStr);
+              } catch (error) {
+                Logger.error(
+                  `Failed to parse FILE header: ${headerStr}`,
+                  error
+                );
+                throw new DropShareError(
+                  ERROR_CODES.INVALID_HEADER,
+                  "Invalid file header"
+                );
+              }
+
+              fileName = headerData.name;
+              fileSize = headerData.size;
+              deviceName = headerData.sender || "Unknown";
+              fileId = headerData.fileId;
+              totalChunks = headerData.totalChunks;
+              expectedChunkSize = headerData.chunkSize;
+
+              if (
+                !fileName ||
+                !fileSize ||
+                !fileId ||
+                !totalChunks ||
+                !expectedChunkSize
+              ) {
+                throw new DropShareError(
+                  ERROR_CODES.INVALID_HEADER,
+                  "Missing file name, size, ID, total chunks, or chunk size"
+                );
+              }
+
+              const calculatedChunkSize = calculateChunkSize(fileSize);
+              if (expectedChunkSize !== calculatedChunkSize) {
+                Logger.error(
+                  `Chunk size mismatch for ${fileId}: expected ${calculatedChunkSize}, received ${expectedChunkSize}`
+                );
+                throw new DropShareError(
+                  ERROR_CODES.INVALID_HEADER,
+                  `Chunk size mismatch: expected ${calculatedChunkSize}, received ${expectedChunkSize}`
+                );
+              }
+
+              if (!checkTransferLimits(fileSize, fileTransfers)) {
+                socket.write(
+                  Buffer.from(`ERROR:${ERROR_CODES.TRANSFER_LIMIT_EXCEEDED}\n`)
+                );
+                Logger.toast(
+                  `Transfer limit exceeded for ${fileName}`,
+                  "error"
+                );
+                buffer = Buffer.alloc(0);
+                return;
+              }
+
+              socket.write(Buffer.from(`ACK_FILE:${fileId}\n`));
+              buffer = buffer.slice(headerEnd + 2);
+              receivingFile = true;
+              startTime = Date.now();
+            } else if (dataStr.startsWith("MSG:")) {
+              const messageEnd = buffer.indexOf(Buffer.from("\n"));
+              if (messageEnd === -1) {
+                Logger.info(
+                  `Incomplete MSG from ${socket.remoteAddress}, waiting...`
+                );
+                return;
+              }
+              const message = buffer.slice(4, messageEnd).toString();
+              setMessages((prev) => [
+                ...prev,
+                `${socket.remoteAddress}: ${message}`,
+              ]);
+              connectedSockets
+                .filter((s) => s !== socket)
+                .forEach((s) => {
+                  s.write(Buffer.from(`MSG:${message}\n`));
+                  Logger.info(`Forwarded MSG to ${s.remoteAddress}`);
+                });
+              buffer = buffer.slice(messageEnd + 1);
+            } else if (
+              dataStr.startsWith("ACK_FILE:") ||
+              dataStr.startsWith("ACK_COMPLETE:") ||
+              dataStr.startsWith("ACK_CHUNK:")
+            ) {
+              const messageEnd = buffer.indexOf(Buffer.from("\n"));
+              if (messageEnd === -1) {
+                Logger.info(
+                  `Incomplete ${dataStr.slice(0, 10)} from ${
+                    socket.remoteAddress
+                  }, waiting...`
+                );
+                return;
+              }
+              Logger.info(`Processed ${dataStr.slice(0, messageEnd)}`);
+              buffer = buffer.slice(messageEnd + 1);
+            } else {
               Logger.warn(
                 `Invalid data from ${socket.remoteAddress}: ${dataStr.slice(
                   0,
@@ -1926,206 +5204,6 @@ export async function startHostServer(
                 )
               );
               buffer = Buffer.alloc(0);
-              return;
-            }
-
-            if (!inFileTransfer) {
-              if (dataStr.startsWith("FILE:")) {
-                const headerEnd = buffer.indexOf(Buffer.from("\n\n"));
-                if (headerEnd === -1) {
-                  Logger.info(
-                    `Incomplete FILE header from ${socket.remoteAddress}, waiting...`
-                  );
-                  return;
-                }
-                const headerStr = buffer.slice(5, headerEnd).toString();
-                Logger.info(`Parsed header: ${headerStr}`);
-                let headerData: {
-                  name: string;
-                  size: number;
-                  sender: string;
-                  fileId: string;
-                };
-                try {
-                  headerData = JSON.parse(headerStr);
-                } catch {
-                  throw new DropShareError(
-                    ERROR_CODES.INVALID_HEADER,
-                    "Invalid file header"
-                  );
-                }
-
-                const fileName = headerData.name;
-                const fileSize = headerData.size;
-                const deviceName = headerData.sender || "Unknown";
-                const fileId = headerData.fileId;
-
-                if (!fileName || !fileSize || !fileId) {
-                  throw new DropShareError(
-                    ERROR_CODES.INVALID_HEADER,
-                    "Missing file name, size, or ID"
-                  );
-                }
-
-                if (!checkTransferLimits(fileSize, fileTransfers)) {
-                  socket.write(
-                    Buffer.from(
-                      `ERROR:${ERROR_CODES.TRANSFER_LIMIT_EXCEEDED}\n`
-                    )
-                  );
-                  Logger.toast(
-                    `Transfer limit exceeded for ${fileName}`,
-                    "error"
-                  );
-                  buffer = Buffer.alloc(0);
-                  return;
-                }
-
-                const chunkSize = calculateChunkSize(fileSize);
-                const totalChunks = Math.ceil(fileSize / chunkSize);
-
-                const transfer: FileTransfer = {
-                  fileId,
-                  fileName,
-                  fileSize,
-                  deviceName,
-                  chunks: Array(totalChunks).fill(undefined),
-                  receivedBytes: 0,
-                  startTime: Date.now(),
-                  totalChunks,
-                  chunkSize,
-                  totalSize: fileSize,
-                  senderIp: socket.remoteAddress || "Unknown",
-                  status: "Receiving",
-                  progress: 0,
-                  lastChunkIndex: -1,
-                  chunkHashes: new Array(totalChunks).fill(""),
-                };
-                fileTransfers.set(fileId, transfer);
-
-                socket.write(Buffer.from(`ACK_START:${fileId}:-1\n`));
-                Logger.info(
-                  `Started new transfer ${fileId} (${fileSize} bytes) from ${deviceName}`
-                );
-
-                inFileTransfer = true;
-                buffer = buffer.slice(headerEnd + 2);
-              } else if (dataStr.startsWith("MSG:")) {
-                const messageEnd = buffer.indexOf(Buffer.from("\n"));
-                if (messageEnd === -1) {
-                  Logger.info(
-                    `Incomplete MSG from ${socket.remoteAddress}, waiting...`
-                  );
-                  return;
-                }
-                const message = buffer.slice(4, messageEnd).toString();
-                setMessages((prev) => [
-                  ...prev,
-                  `${socket.remoteAddress}: ${message}`,
-                ]);
-                connectedSockets
-                  .filter((s) => s !== socket)
-                  .forEach((s) => {
-                    s.write(Buffer.from(`MSG:${message}\n`));
-                  });
-                buffer = buffer.slice(messageEnd + 1);
-              } else if (dataStr.startsWith("CHUNK:")) {
-                const chunkEnd = buffer.indexOf(Buffer.from("\n"));
-                if (chunkEnd === -1) {
-                  Logger.info(
-                    `Incomplete CHUNK header from ${socket.remoteAddress}, waiting...`
-                  );
-                  return;
-                }
-                const chunkHeader = buffer.slice(0, chunkEnd).toString();
-                const [, fileId, chunkIndexStr, chunkDataBase64] =
-                  chunkHeader.split(":");
-                const chunkIndex = parseInt(chunkIndexStr);
-                const transfer = fileTransfers.get(fileId);
-                if (!transfer) {
-                  Logger.warn(`No transfer for ${fileId}, ignoring chunk`);
-                  buffer = Buffer.alloc(0);
-                  return;
-                }
-                const chunkData = Buffer.from(chunkDataBase64, "base64");
-                transfer.chunks[chunkIndex] = chunkData;
-                transfer.receivedBytes += chunkData.length;
-                transfer.lastChunkIndex = chunkIndex;
-                transfer.chunkHashes[chunkIndex] = "";
-                socket.write(
-                  Buffer.from(`ACK_CHUNK:${fileId}:${chunkIndex}\n`)
-                );
-                Logger.info(
-                  `Processed and ACKed chunk ${chunkIndex} for ${fileId}, ${transfer.receivedBytes}/${transfer.totalSize} bytes`
-                );
-
-                const elapsedTime =
-                  (Date.now() - transfer.startTime) / 1000 || 1;
-                const speed = (
-                  transfer.receivedBytes /
-                  elapsedTime /
-                  1024
-                ).toFixed(2);
-                const percentage =
-                  (transfer.receivedBytes / transfer.totalSize) * 100;
-                setTransferProgress?.((prev) => [
-                  ...prev.filter((p) => p.fileId !== fileId),
-                  {
-                    fileId,
-                    fileName: transfer.fileName,
-                    progress: `${transfer.receivedBytes}/${transfer.totalSize} bytes`,
-                    speed: `${speed} KB/s`,
-                    percentage,
-                  },
-                ]);
-
-                if (transfer.receivedBytes >= transfer.totalSize) {
-                  const savePath = `${RNFS.DocumentDirectoryPath}/${transfer.fileName}`;
-                  const assembled = Buffer.concat(
-                    transfer.chunks.filter((c): c is Buffer => !!c)
-                  );
-                  await RNFS.writeFile(
-                    savePath,
-                    assembled.toString("base64"),
-                    "base64"
-                  );
-                  setReceivedFiles((prev) => [...prev, savePath]);
-                  Logger.info(
-                    `Received and saved file: ${savePath} from ${transfer.deviceName}`
-                  );
-                  fileTransfers.delete(fileId);
-                  inFileTransfer = false;
-                }
-                buffer = buffer.slice(chunkEnd + 1);
-              } else if (
-                dataStr.startsWith("ACK_START:") ||
-                dataStr.startsWith("ACK_CHUNK:") ||
-                dataStr.startsWith("ERROR:")
-              ) {
-                const messageEnd = buffer.indexOf(Buffer.from("\n"));
-                if (messageEnd === -1) {
-                  Logger.info(
-                    `Incomplete ${dataStr.slice(0, 10)} from ${
-                      socket.remoteAddress
-                    }, waiting...`
-                  );
-                  return;
-                }
-                buffer = buffer.slice(messageEnd + 1);
-              } else {
-                Logger.warn(
-                  `Unknown data from ${socket.remoteAddress}: ${dataStr.slice(
-                    0,
-                    50
-                  )}...`
-                );
-                socket.write(
-                  Buffer.from(
-                    `ERROR:${ERROR_CODES.INVALID_HEADER}:Invalid protocol\n`
-                  )
-                );
-                buffer = Buffer.alloc(0);
-              }
             }
           }
         } catch (error) {
@@ -2140,7 +5218,9 @@ export async function startHostServer(
           );
           socket.write(Buffer.from(`ERROR:${err.code}:${err.message}\n`));
           buffer = Buffer.alloc(0);
-          inFileTransfer = false;
+          receivingFile = false;
+          fileChunks = {};
+          chunkCounts = {};
         }
       });
 
@@ -2175,7 +5255,7 @@ export async function startHostServer(
   }
 }
 
-async function sendFileInChunks(
+async function sendFile(
   socket: ConnectedSocket,
   fileName: string,
   filePath: string,
@@ -2184,114 +5264,173 @@ async function sendFileInChunks(
   setTransferProgress?: React.Dispatch<React.SetStateAction<TransferProgress[]>>
 ): Promise<void> {
   try {
-    const fileSize = (await RNFS.stat(filePath)).size;
+    const fileData = await RNFS.readFile(filePath, "base64");
+    const fileBuffer = Buffer.from(fileData, "base64");
+    const fileSize = fileBuffer.length;
     const chunkSize = calculateChunkSize(fileSize);
     const totalChunks = Math.ceil(fileSize / chunkSize);
-    const fileTransfers = new Map<string, FileTransfer>();
 
-    const transfer: FileTransfer = {
-      fileId,
-      fileName,
-      fileSize,
-      deviceName,
-      chunks: [],
-      receivedBytes: 0,
-      startTime: Date.now(),
-      totalChunks,
-      chunkSize,
-      totalSize: fileSize,
-      senderIp: await getLocalIPAddress(),
-      status: "Sending",
-      progress: 0,
-      lastChunkIndex: -1,
-      chunkHashes: new Array(totalChunks).fill(""),
-    };
-    fileTransfers.set(fileId, transfer);
-
-    const header = Buffer.from(
-      `FILE:${JSON.stringify({
-        name: fileName,
-        size: fileSize,
-        sender: deviceName,
-        fileId,
-      })}\n\n`
-    );
-
-    await new Promise<void>((resolve, reject) => {
-      socket.write(header, "binary", (err) => (err ? reject(err) : resolve()));
-    });
-    Logger.info(`Sent header for ${fileId}`);
-
-    let sentBytes = 0;
-    const startTime = Date.now();
-
-    for (let chunkIndex = 0; chunkIndex < totalChunks; chunkIndex++) {
-      const offset = chunkIndex * chunkSize;
-      const length = Math.min(chunkSize, fileSize - offset);
-      const chunkData = await RNFS.read(filePath, length, offset, "base64");
-      const chunkBuffer = Buffer.from(chunkData, "base64");
-
-      await new Promise<void>((resolve, reject) => {
-        const timeout = setTimeout(() => {
-          reject(
-            new DropShareError(
-              ERROR_CODES.NETWORK_ERROR,
-              `Timeout waiting for ACK_CHUNK ${chunkIndex}`
-            )
-          );
-        }, ACK_TIMEOUT);
-        socket.once("data", (data) => {
-          clearTimeout(timeout);
-          const message = data.toString();
-          if (
-            message.startsWith("ACK_CHUNK:") &&
-            message.includes(`${fileId}:${chunkIndex}`)
-          ) {
-            resolve();
-          } else {
+    let retries = 0;
+    while (retries < MAX_RETRIES) {
+      try {
+        // Send file header
+        await new Promise<void>((resolve, reject) => {
+          const timeout = setTimeout(() => {
             reject(
               new DropShareError(
                 ERROR_CODES.NETWORK_ERROR,
-                "Invalid ACK_CHUNK response"
+                `Timeout waiting for ACK_FILE (attempt ${retries + 1})`
               )
             );
-          }
+          }, ACK_TIMEOUT);
+          socket.once("data", (data) => {
+            clearTimeout(timeout);
+            const message = data.toString();
+            Logger.info(`Received for ACK_FILE: ${message}`);
+            if (message.startsWith(`ACK_FILE:${fileId}`)) {
+              resolve();
+            } else {
+              reject(
+                new DropShareError(
+                  ERROR_CODES.INVALID_HEADER,
+                  `Invalid ACK_FILE response: ${message}`
+                )
+              );
+            }
+          });
+          const header = Buffer.from(
+            `FILE:${JSON.stringify({
+              name: fileName,
+              size: fileSize,
+              sender: deviceName,
+              fileId,
+              totalChunks,
+              chunkSize,
+            })}\n\n`
+          );
+          socket.write(header);
+          Logger.info(`Sent header for ${fileId}: ${header.toString()}`);
         });
-        socket.write(
-          Buffer.from(
-            `CHUNK:${fileId}:${chunkIndex}:${chunkBuffer.toString("base64")}\n`
-          )
-        );
-      });
 
-      sentBytes += chunkBuffer.length;
-      transfer.lastChunkIndex = chunkIndex;
-      transfer.chunkHashes[chunkIndex] = "";
-      const elapsedTime = (Date.now() - startTime) / 1000 || 1;
-      const speed = (sentBytes / elapsedTime / 1024).toFixed(2);
-      setTransferProgress?.((prev) => [
-        ...prev.filter((p) => p.fileId !== fileId),
-        {
-          fileId,
-          fileName,
-          progress: `${sentBytes}/${fileSize} bytes`,
-          speed: `${speed} KB/s`,
-          percentage: (sentBytes / fileSize) * 100,
-        },
-      ]);
-      Logger.info(
-        `Sent chunk ${chunkIndex} for ${fileId}, ${sentBytes}/${fileSize} bytes`
-      );
+        const startTime = Date.now();
+        let sentBytes = 0;
+
+        // Send chunks
+        for (let i = 0; i < totalChunks; i++) {
+          const start = i * chunkSize;
+          const chunk = fileBuffer.slice(start, start + chunkSize);
+          const actualChunkSize = chunk.length;
+
+          await new Promise<void>((resolve, reject) => {
+            const timeout = setTimeout(() => {
+              reject(
+                new DropShareError(
+                  ERROR_CODES.NETWORK_ERROR,
+                  `Timeout waiting for ACK_CHUNK:${i} (attempt ${retries + 1})`
+                )
+              );
+            }, ACK_TIMEOUT);
+            socket.once("data", (data) => {
+              clearTimeout(timeout);
+              const message = data.toString();
+              Logger.info(`Received for ACK_CHUNK:${i}: ${message}`);
+              if (message.startsWith(`ACK_CHUNK:${fileId}:${i}`)) {
+                resolve();
+              } else {
+                reject(
+                  new DropShareError(
+                    ERROR_CODES.INVALID_HEADER,
+                    `Invalid ACK_CHUNK response: ${message}`
+                  )
+                );
+              }
+            });
+            const chunkHeader = Buffer.from(
+              `CHUNK:${JSON.stringify({
+                fileId,
+                chunkIndex: i,
+                chunkSize: actualChunkSize,
+              })}\n\n`
+            );
+            socket.write(Buffer.concat([chunkHeader, chunk]));
+            Logger.info(
+              `Sent chunk ${i}/${totalChunks} for ${fileId} (${actualChunkSize} bytes)`
+            );
+          });
+
+          sentBytes += actualChunkSize;
+          const percentage = (sentBytes / fileSize) * 100;
+          const elapsedTime = (Date.now() - startTime) / 1000 || 1;
+          const speed = (sentBytes / elapsedTime / 1024).toFixed(2);
+
+          setTransferProgress?.((prev) => [
+            ...prev.filter((p) => p.fileId !== fileId),
+            {
+              fileId,
+              fileName,
+              progress: `${sentBytes}/${fileSize} bytes`,
+              speed: `${speed} KB/s`,
+              percentage,
+            },
+          ]);
+        }
+
+        // Wait for final ACK
+        await new Promise<void>((resolve, reject) => {
+          const timeout = setTimeout(() => {
+            reject(
+              new DropShareError(
+                ERROR_CODES.NETWORK_ERROR,
+                `Timeout waiting for ACK_COMPLETE (attempt ${retries + 1})`
+              )
+            );
+          }, ACK_TIMEOUT);
+          socket.once("data", (data) => {
+            clearTimeout(timeout);
+            const message = data.toString();
+            Logger.info(`Received for ACK_COMPLETE: ${message}`);
+            if (message.startsWith(`ACK_COMPLETE:${fileId}`)) {
+              const elapsedTime = (Date.now() - startTime) / 1000 || 1;
+              const speed = (fileSize / elapsedTime / 1024).toFixed(2);
+              setTransferProgress?.((prev) => [
+                ...prev.filter((p) => p.fileId !== fileId),
+                {
+                  fileId,
+                  fileName,
+                  progress: `${fileSize}/${fileSize} bytes`,
+                  speed: `${speed} KB/s`,
+                  percentage: 100,
+                },
+              ]);
+              resolve();
+            } else {
+              reject(
+                new DropShareError(
+                  ERROR_CODES.NETWORK_ERROR,
+                  `Invalid ACK_COMPLETE response: ${message}`
+                )
+              );
+            }
+          });
+        });
+        break;
+      } catch (error) {
+        retries++;
+        if (retries === MAX_RETRIES) {
+          throw error;
+        }
+        Logger.warn(`Retrying file send for ${fileId} after error ${error}`);
+        await new Promise((resolve) => setTimeout(resolve, 1000));
+      }
     }
-
-    fileTransfers.delete(fileId);
-    Logger.info(`Sent file: ${fileName} from ${deviceName}`);
   } catch (error) {
-    Logger.error(`Failed to send file ${fileName}`, error);
+    Logger.error(`Error in file transfer for ${fileName}`, error);
     throw DropShareError.from(
       error,
       ERROR_CODES.NETWORK_ERROR,
-      "File transfer failed"
+      `Transfer failed: ${
+        error instanceof Error ? error.message : "Unknown error"
+      }`
     );
   }
 }
@@ -2309,14 +5448,14 @@ export async function sendHostFile(
   }
 
   const fileName = filePath.split("/").pop() || "unknown";
-  const fileId = `${Date.now()}_${fileName}`;
+  const fileId = `${Date.now()}-${fileName}`;
   const tempPath = `${RNFS.TemporaryDirectoryPath}/${fileId}`;
   await RNFS.writeFile(tempPath, fileData.toString("base64"), "base64");
 
   try {
     await Promise.all(
       connectedSockets.map((socket) =>
-        sendFileInChunks(
+        sendFile(
           socket,
           fileName,
           tempPath,
@@ -2326,19 +5465,11 @@ export async function sendHostFile(
         )
       )
     );
-
-    setTransferProgress?.((prev) => [
-      ...prev.filter((p) => p.fileId !== fileId),
-      {
-        fileId,
-        fileName,
-        progress: `${fileData.length}/${fileData.length} bytes`,
-        speed: "0 KB/s",
-        percentage: 100,
-      },
-    ]);
-
     Logger.info(`Sent file: ${fileName} from ${username} to all clients`);
+    Logger.toast(`Sent file ${fileName}`, "info");
+  } catch (error) {
+    Logger.error(`Failed to send file ${fileName}`, error);
+    throw error;
   } finally {
     await RNFS.unlink(tempPath).catch((err) =>
       Logger.error(`Failed to delete temp file ${tempPath}`, err)
@@ -2365,56 +5496,35 @@ export async function sendMultipleHostFiles(
       username,
       setTransferProgress
     );
+    Logger.info(`Sent file: ${filePath.split("/").pop()} from ${username}`);
   }
 }
 
-export function sendHostMessage(
-  server: TCPSocket.Server | null,
-  message: string,
-  username: string
-): void {
-  if (!server || connectedSockets.length === 0) {
+export function sendHostMessage(message: string, username: string): void {
+  if (connectedSockets.length === 0) {
     Logger.toast("No connected clients to send message", "error");
     return;
   }
+
   connectedSockets.forEach((socket) => {
     socket.write(Buffer.from(`MSG:${username}: ${message}\n`));
+    Logger.info(`Sent MSG to ${socket.remoteAddress}: ${message}`);
   });
 }
 
 export function stopHostServer(): void {
   Logger.info("Stopping host server...");
-  isServerRunning = false;
-
-  if (udpSocket) {
-    udpSocket.close();
-    udpSocket = null;
-    Logger.info("UDP socket closed");
-  }
-
+  connectedSockets.forEach((socket) => socket.destroy());
+  connectedSockets = [];
   if (server) {
     server.close();
     server = null;
-    Logger.info("TCP server closed");
+    Logger.info("Host TCP server stopped");
   }
-
-  connectedSockets.forEach((socket) => {
-    socket.destroy();
-    Logger.info(`Closed socket for ${socket.remoteAddress}`);
-  });
-  connectedSockets = [];
-  Logger.info("Host server stopped");
-}
-
-export function kickClient(clientIp: string): void {
-  const socket = connectedSockets.find((s) => s.remoteAddress === clientIp);
-  if (!socket) {
-    Logger.warn(`No client found with IP ${clientIp}`);
-    return;
+  if (udpSocket) {
+    udpSocket.close();
+    udpSocket = null;
+    Logger.info("Host UDP socket closed");
   }
-  socket.end();
-  connectedSockets = connectedSockets.filter(
-    (s) => s.remoteAddress !== clientIp
-  );
-  Logger.toast(`Kicked client ${clientIp}`, "info");
+  isServerRunning = false;
 }
