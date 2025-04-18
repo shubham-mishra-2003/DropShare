@@ -162,7 +162,7 @@ import { NetworkInfo } from "react-native-network-info";
 import { Logger } from "./Logger";
 
 export const MAX_CONCURRENT_FILES = 15;
-export const MAX_TOTAL_SIZE = 5 * 1024 * 1024 * 1024; // 5GB
+export const MAX_TOTAL_SIZE = 1 * 1024 * 1024 * 1024; // 5GB
 export const MAX_CONCURRENT_INCOMING = 3;
 export const QUEUE_RETRY_DELAY = 10_000;
 

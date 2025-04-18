@@ -333,7 +333,7 @@ export const insertFile = async (
       `INSERT OR REPLACE INTO files (name, path, type, size, created_at, category, ai_tags, content_summary)
        VALUES (?, ?, ?, ?, datetime('now'), ?, ?, ?)`,
       [name, path, type, size, category, aiTags, contentSummary],
-      () => {}, // Silent success to reduce logging
+      () => {},
       (_, error) => console.error("❌ Error indexing file:", error)
     );
   });
@@ -369,7 +369,6 @@ export const startIndexing = async (
   await initializeDB();
   if (!database) return;
   const files = await scanEntireStorage();
-  // Batch process files to avoid crashes
   const batchSize = 50;
   for (let i = 0; i < files.length; i += batchSize) {
     const batch = files.slice(i, i + batchSize);

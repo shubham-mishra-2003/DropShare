@@ -15,17 +15,6 @@ import { Colors } from "../constants/Colors";
 import { useTheme } from "../hooks/ThemeProvider";
 import MediaPicker from "../components/MediaPicker";
 import StyledText from "../components/ui/StyledText";
-import TCPSocket from "react-native-tcp-socket";
-
-const MAX_CONCURRENT_FILES = 15;
-const MAX_TOTAL_SIZE = 5 * 1024 * 1024 * 1024; // 5GB
-
-const calculateChunkSize = (fileSize: number): number => {
-  if (fileSize <= 1024 * 1024) return 16 * 1024; // <1MB: 16KB
-  if (fileSize <= 10 * 1024 * 1024) return 64 * 1024; // 1MB–10MB: 64KB
-  if (fileSize <= 100 * 1024 * 1024) return 1024 * 1024; // 10MB–100MB: 1MB
-  return 4 * 1024 * 1024; // >100MB: 4MB
-};
 
 interface TransferStatus {
   fileId: string;
@@ -44,10 +33,9 @@ const ClientTest: React.FC = () => {
     startClient,
     connectToHostIp,
     sendMessage,
-    sendFile,
+    sendFiles,
     isConnected,
     disconnect,
-    sendMultipleFiles,
   } = useNetwork();
   const [message, setMessage] = useState("");
   const [pickerVisible, setPickerVisible] = useState(false);
@@ -63,121 +51,15 @@ const ClientTest: React.FC = () => {
     }
   };
 
-  // const handleSendFiles = async () => {
-  //   if (selectToSend.length > MAX_CONCURRENT_FILES) {
-  //     console.log(
-  //       `❌ Cannot send ${selectToSend.length} files; max ${MAX_CONCURRENT_FILES}`
-  //     );
-  //     return;
-  //   }
-
-  //   let totalSize = 0;
-  //   for (const file of selectToSend) {
-  //     const stat = await RNFS.stat(file.path);
-  //     totalSize += stat.size;
-  //     if (stat.size > MAX_TOTAL_SIZE) {
-  //       console.log(`❌ File ${file.name} exceeds 5GB limit`);
-  //       return;
-  //     }
-  //   }
-  //   if (totalSize > MAX_TOTAL_SIZE) {
-  //     console.log("❌ Total file size exceeds 5GB limit");
-  //     return;
-  //   }
-
-  //   const filesMetadata = await Promise.all(
-  //     selectToSend.map(async (file) => {
-  //       const stat = await RNFS.stat(file.path);
-  //       const fileSize = stat.size;
-  //       const chunkSize = calculateChunkSize(fileSize);
-  //       const totalChunks = Math.ceil(fileSize / chunkSize);
-  //       const fileId = `${file.name}-${Date.now()}`;
-  //       return {
-  //         fileId,
-  //         fileName: file.name,
-  //         fileSize,
-  //         chunkSize,
-  //         totalChunks,
-  //       };
-  //     })
-  //   );
-
-  //   const header = Buffer.from(
-  //     JSON.stringify({
-  //       fileCount: selectToSend.length,
-  //       files: filesMetadata,
-  //     })
-  //   );
-
-  //   await sendFile("HEADER", header);
-
-  //   for (const file of selectToSend) {
-  //     const stat = await RNFS.stat(file.path);
-  //     const fileSize = stat.size;
-  //     const chunkSize = calculateChunkSize(fileSize);
-  //     const totalChunks = Math.ceil(fileSize / chunkSize);
-  //     const fileId = `${file.name}-${Date.now()}`;
-
-  //     setLocalProgress((prev) => [
-  //       ...prev,
-  //       {
-  //         fileId,
-  //         fileName: file.name,
-  //         totalChunks,
-  //         receivedChunks: 0,
-  //         status: "Sending",
-  //       },
-  //     ]);
-
-  //     let offset = 0;
-  //     let chunkIndex = 0;
-  //     while (offset < fileSize) {
-  //       const chunk = await RNFS.read(file.path, chunkSize, offset, "base64");
-  //       const buffer = Buffer.from(chunk, "base64");
-  //       const chunkHeader = Buffer.from(
-  //         JSON.stringify({ fileId, chunkIndex, totalChunks })
-  //       );
-  //       const chunkData = Buffer.concat([
-  //         Buffer.from("CHUNK:"),
-  //         chunkHeader,
-  //         Buffer.from("\n\n"),
-  //         buffer,
-  //       ]);
-  //       await sendFile(`${file.path}-chunk-${chunkIndex}`, chunkData);
-  //       offset += chunkSize;
-  //       chunkIndex++;
-  //       setLocalProgress((prev) =>
-  //         prev.map((p) =>
-  //           p.fileId === fileId
-  //             ? { ...p, receivedChunks: chunkIndex, status: "Sending" }
-  //             : p
-  //         )
-  //       );
-  //     }
-
-  //     setLocalProgress((prev) =>
-  //       prev.map((p) =>
-  //         p.fileId === fileId ? { ...p, status: "Completed" } : p
-  //       )
-  //     );
-  //   }
-
-  //   setSelectToSend([]);
-  //   setPickerVisible(false);
-  // };
-
   const handleSendFiles = async () => {
     for (const file of selectToSend) {
       const fileData = await RNFS.readFile(file.path, "base64");
       const buffer = Buffer.from(fileData, "base64");
-      await sendMultipleFiles(
-        [{ filePath: file.path, fileData: buffer }],
-      );
+      await sendFiles([{ filePath: file.path, fileData: buffer }]);
     }
     setSelectToSend([]);
     setPickerVisible(false);
   };
-
   return (
     <View style={styles.container}>
       <Text style={styles.title}>Client Dashboard</Text>

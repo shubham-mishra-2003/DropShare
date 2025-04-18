@@ -1,4 +1,10 @@
-import { View, Text, ActivityIndicator, TouchableOpacity } from "react-native";
+import {
+  View,
+  ActivityIndicator,
+  TouchableOpacity,
+  Vibration,
+  Alert,
+} from "react-native";
 import React, { useEffect, useState } from "react";
 import QRCode from "react-native-qrcode-svg";
 import { useTheme } from "../../hooks/ThemeProvider";
@@ -20,38 +26,53 @@ const QRGenerator: React.FC<QRGeneratorProps> = ({ visible, setVisible }) => {
   const { colorScheme } = useTheme();
   const [loading, setLoading] = useState(true);
   const [qrValue, setQrValue] = useState("");
-  const { startHosting, isConnected } = useNetwork();
+  const { startHosting, isConnected, stopHosting } = useNetwork();
   const { username } = useUsername();
-  const deviceName = username;
 
-  const setUpServer = async () => {
-    const ip = await getLocalIPAddress();
-    const port = 4000;
-    startHosting();
-    setQrValue(`dropshare://${ip}:${port}|${deviceName}`);
-    console.log(`Server started: ${ip}:${port}`);
-    setLoading(false);
+  const modalClose = () => {
+    if (!isConnected) {
+      stopHosting();
+    }
+    setVisible(false);
   };
 
   useEffect(() => {
+    const startHostingAndSetQr = async () => {
+      try {
+        setLoading(true);
+        await startHosting();
+        const ip = await getLocalIPAddress();
+        if (!ip) {
+          throw new Error("No IP address found");
+        }
+        const qrData = `dropshare://${ip}:${username}`;
+        console.log("Generated QR Value:", qrData);
+        setQrValue(qrData);
+      } catch (error) {
+        console.error("Failed to generate QR code:", error);
+        Alert.alert(
+          "Error",
+          "Failed to retrieve IP address. Ensure you are connected to a Wi-Fi network.",
+          [{ text: "OK", onPress: modalClose }]
+        );
+      } finally {
+        setLoading(false);
+      }
+    };
+
     if (visible) {
-      setUpServer();
+      startHostingAndSetQr();
     }
-  });
+  }, [visible]);
 
   useEffect(() => {
     if (isConnected) {
-      setVisible(false);
-      navigate("connection");
+      navigate("connection").then(() => Vibration.vibrate(10));
     }
   }, [isConnected]);
 
   return (
-    <BottomSheet
-      visible={visible}
-      onRequestClose={() => setVisible(false)}
-      height={510}
-    >
+    <BottomSheet visible={visible} onRequestClose={modalClose} height={500}>
       <View
         style={{
           flex: 1,
@@ -62,17 +83,44 @@ const QRGenerator: React.FC<QRGeneratorProps> = ({ visible, setVisible }) => {
       >
         {loading ? (
           <ActivityIndicator size={30} color={Colors[colorScheme].tint} />
+        ) : !qrValue ? (
+          <View
+            style={{ justifyContent: "center", alignItems: "center", gap: 20 }}
+          >
+            <StyledText
+              fontWeight="bold"
+              style={{
+                fontSize: 20,
+                color: Colors[colorScheme].text,
+                textAlign: "center",
+              }}
+              text="Unable to generate QR code. Please check your network."
+            />
+          </View>
         ) : (
           <>
-            <QRCode
-              value={qrValue}
-              size={200}
-              logoSize={70}
-              logoBackgroundColor="#000"
-              logoMargin={0}
-              logoBorderRadius={50}
-              logo={require("../../assets/images/dropshareLogo.png")}
-            />
+            <View
+              style={{
+                width: "100%",
+                height: 200,
+                justifyContent: "center",
+                alignItems: "center",
+                overflow: "hidden",
+                borderRadius: 20,
+                marginTop: 20,
+              }}
+            >
+              <QRCode
+                value={qrValue}
+                size={200}
+                logoSize={60}
+                logoMargin={5}
+                logoBorderRadius={50}
+                logo={require("../../assets/images/dropshareLogo.png")}
+                backgroundColor={Colors[colorScheme].background}
+                color={Colors[colorScheme].text}
+              />
+            </View>
             <StyledText
               fontWeight="bold"
               style={{
@@ -80,7 +128,7 @@ const QRGenerator: React.FC<QRGeneratorProps> = ({ visible, setVisible }) => {
                 fontSize: 18,
                 textAlign: "center",
               }}
-              text="Ensure you are in same wifi network"
+              text="Ensure you are on the same Wi-Fi network"
             />
             <StyledText
               fontWeight="bold"
@@ -89,7 +137,7 @@ const QRGenerator: React.FC<QRGeneratorProps> = ({ visible, setVisible }) => {
                 fontSize: 22,
                 textAlign: "center",
               }}
-              text="Ask the device to scan this QR to establish connection"
+              text="Ask another device to scan this QR code to connect"
             />
           </>
         )}

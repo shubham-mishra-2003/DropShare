@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useState } from "react";
 import {
   View,
   Text,
@@ -23,10 +23,8 @@ const HostTest: React.FC = () => {
     receivedFiles,
     startHosting,
     sendMessage,
-    sendFile,
-    isHost,
-    // stopHosting,
-    // removeClient,
+    sendFiles,
+    kickClient,
   } = useNetwork();
   const [message, setMessage] = useState("");
   const [pickerVisible, setPickerVisible] = useState(false);
@@ -45,10 +43,14 @@ const HostTest: React.FC = () => {
     for (const file of selectToSend) {
       const fileData = await RNFS.readFile(file.path, "base64");
       const buffer = Buffer.from(fileData, "base64");
-      await sendFile(file.path, buffer);
+      await sendFiles([{ filePath: file.path, fileData: buffer }]);
     }
     setSelectToSend([]);
     setPickerVisible(false);
+  };
+
+  const handleKickClient = (clientIp: string) => {
+    kickClient(clientIp);
   };
   return (
     <View style={styles.container}>
@@ -67,12 +69,12 @@ const HostTest: React.FC = () => {
                 <Text style={styles.cardText}>
                   {item.name} ({item.ip})
                 </Text>
-                {/* <TouchableOpacity
-                    style={styles.removeButton}
-                    onPress={() => removeClient(item.ip)}
-                  >
-                    <Text style={styles.buttonText}>Remove</Text>
-                  </TouchableOpacity> */}
+                <TouchableOpacity
+                  style={styles.removeButton}
+                  onPress={() => handleKickClient(item.ip)}
+                >
+                  <Text style={styles.buttonText}>Remove Client</Text>
+                </TouchableOpacity>
               </View>
             )}
             ListEmptyComponent={
@@ -201,6 +203,7 @@ const createStyles = (colorScheme: "light" | "dark") =>
       color: Colors[colorScheme].background,
       fontSize: 16,
       fontWeight: "600",
+      textAlign: "center",
     },
     card: {
       backgroundColor: Colors[colorScheme].itemBackground,

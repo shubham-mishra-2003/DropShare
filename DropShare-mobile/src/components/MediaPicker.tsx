@@ -299,6 +299,8 @@ import BottomSheet from "./ui/BottomSheet";
 import { Colors } from "../constants/Colors";
 import { useTheme } from "../hooks/ThemeProvider";
 import { screenWidth } from "../utils/Constants";
+import StyledText from "./ui/StyledText";
+import { formatFileSize } from "../utils/FileSystemUtil";
 
 interface Category {
   name: string;
@@ -489,7 +491,12 @@ const MediaPicker = ({
                   source={{ uri: `file://${file.path}` }}
                   style={{ height: 40, width: 40 }}
                 />
-                <Text style={styles.fileName}>{file.name}</Text>
+                <View style={{ flexDirection: "column", gap: 5, width: '100%' }}>
+                  <StyledText style={styles.fileName}>{file.name}</StyledText>
+                  <StyledText style={styles.fileName}>
+                    {formatFileSize(file.size)}
+                  </StyledText>
+                </View>
               </TouchableOpacity>
             ))
           ) : (
