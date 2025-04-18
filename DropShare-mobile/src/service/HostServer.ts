@@ -108,8 +108,12 @@ export async function startHostServer(
       let startTime = 0;
       let totalChunks = 0;
       let expectedChunkSize = 0;
+      let lastLoggedChunkIndex: number | null = null;
 
       socket.on("data", async (data: string | Buffer) => {
+        Logger.info(
+          `Received data of length ${data.length} bytes from ${socket.remoteAddress}`
+        );
         try {
           if (receivingFile) {
             buffer = Buffer.concat([
@@ -137,7 +141,7 @@ export async function startHostServer(
                   chunkData = JSON.parse(headerStr);
                 } catch (error) {
                   Logger.error(
-                    `Failed to parse CHUNK header: ${headerStr}`,
+                    `Failed to parse CHUNK header for fileId ${fileId}: ${headerStr}`,
                     error
                   );
                   throw new DropShareError(
@@ -150,16 +154,19 @@ export async function startHostServer(
                 const expectedChunkEnd = headerEnd + 2 + chunkSize;
 
                 if (buffer.length < expectedChunkEnd) {
-                  Logger.info(
-                    `Incomplete chunk data for ${chunkData.fileId}, waiting...`
-                  );
+                  if (lastLoggedChunkIndex !== chunkData.chunkIndex) {
+                    Logger.info(
+                      `Incomplete chunk data for ${chunkData.fileId} (chunkIndex: ${chunkData.chunkIndex}), waiting...`
+                    );
+                    lastLoggedChunkIndex = chunkData.chunkIndex;
+                  }
                   return;
                 }
 
                 const chunk = buffer.slice(headerEnd + 2, expectedChunkEnd);
                 if (chunk.length !== chunkSize) {
                   Logger.error(
-                    `Chunk size mismatch for ${chunkData.fileId}: expected ${chunkSize}, received ${chunk.length}`
+                    `Chunk size mismatch for ${chunkData.fileId} (chunkIndex: ${chunkData.chunkIndex}): expected ${chunkSize}, received ${chunk.length}`
                   );
                   throw new DropShareError(
                     ERROR_CODES.CORRUPTED_CHUNK,
@@ -167,6 +174,10 @@ export async function startHostServer(
                   );
                 }
 
+                Logger.info(
+                  `Processed chunk ${chunkData.chunkIndex} for ${chunkData.fileId}`
+                );
+                lastLoggedChunkIndex = null; // Reset after processing
                 if (!fileChunks[fileId]) {
                   fileChunks[fileId] = [];
                   chunkCounts[fileId] = 0;
@@ -199,7 +210,6 @@ export async function startHostServer(
                 buffer = buffer.slice(expectedChunkEnd);
 
                 if (chunkCounts[fileId] === totalChunks) {
-                  // All chunks received, reconstruct file
                   const fileBuffer = Buffer.concat(
                     fileChunks[fileId].filter(Boolean)
                   );
@@ -238,7 +248,7 @@ export async function startHostServer(
                 }
               } else {
                 Logger.warn(
-                  `Unexpected data while receiving file: ${dataStr.slice(
+                  `Unexpected data while receiving file for ${fileId}: ${dataStr.slice(
                     0,
                     50
                   )}...`
@@ -250,7 +260,6 @@ export async function startHostServer(
             return;
           }
 
-          // Handle protocol messages
           buffer = Buffer.concat([
             buffer,
             typeof data === "string" ? Buffer.from(data) : data,
@@ -709,7 +718,6 @@ export function stopHostServer(): void {
   }
   isServerRunning = false;
 }
-
 
 // import dgram from "react-native-udp";
 // import net from "react-native-tcp-socket";

@@ -99,6 +99,7 @@ export async function connectToHost(
   let startTime = 0;
   let totalChunks = 0;
   let expectedChunkSize = 0;
+  let lastLoggedChunkIndex: number | null = null;
 
   client.on("connect", () => {
     Logger.info("Connected to host!");
@@ -107,6 +108,7 @@ export async function connectToHost(
   });
 
   client.on("data", async (data: string | Buffer) => {
+    Logger.info(`Received data of length ${data.length} bytes`);
     try {
       if (receivingFile) {
         buffer = Buffer.concat([
@@ -130,7 +132,10 @@ export async function connectToHost(
             try {
               chunkData = JSON.parse(headerStr);
             } catch (error) {
-              Logger.error(`Failed to parse CHUNK header: ${headerStr}`, error);
+              Logger.error(
+                `Failed to parse CHUNK header for fileId ${fileId}: ${headerStr}`,
+                error
+              );
               throw new DropShareError(
                 ERROR_CODES.INVALID_HEADER,
                 "Invalid chunk header"
@@ -139,15 +144,18 @@ export async function connectToHost(
             const chunkSize = chunkData.chunkSize;
             const expectedChunkEnd = headerEnd + 2 + chunkSize;
             if (buffer.length < expectedChunkEnd) {
-              Logger.info(
-                `Incomplete chunk data for ${chunkData.fileId}, waiting...`
-              );
+              if (lastLoggedChunkIndex !== chunkData.chunkIndex) {
+                Logger.info(
+                  `Incomplete chunk data for ${chunkData.fileId} (chunkIndex: ${chunkData.chunkIndex}), waiting...`
+                );
+                lastLoggedChunkIndex = chunkData.chunkIndex;
+              }
               return;
             }
             const chunk = buffer.slice(headerEnd + 2, expectedChunkEnd);
             if (chunk.length !== chunkSize) {
               Logger.error(
-                `Chunk size mismatch for ${chunkData.fileId}: expected ${chunkSize}, received ${chunk.length}`
+                `Chunk size mismatch for ${chunkData.fileId} (chunkIndex: ${chunkData.chunkIndex}): expected ${chunkSize}, received ${chunk.length}`
               );
               throw new DropShareError(
                 ERROR_CODES.CORRUPTED_CHUNK,
@@ -155,6 +163,10 @@ export async function connectToHost(
               );
             }
 
+            Logger.info(
+              `Processed chunk ${chunkData.chunkIndex} for ${chunkData.fileId}`
+            );
+            lastLoggedChunkIndex = null; // Reset after processing
             if (!fileChunks[fileId]) {
               fileChunks[fileId] = [];
               chunkCounts[fileId] = 0;
@@ -187,7 +199,6 @@ export async function connectToHost(
             buffer = buffer.slice(expectedChunkEnd);
 
             if (chunkCounts[fileId] === totalChunks) {
-              // All chunks received, reconstruct file
               const fileBuffer = Buffer.concat(
                 fileChunks[fileId].filter(Boolean)
               );
@@ -223,7 +234,10 @@ export async function connectToHost(
             }
           } else {
             Logger.warn(
-              `Unexpected data while receiving file: ${dataStr.slice(0, 50)}...`
+              `Unexpected data while receiving file for ${fileId}: ${dataStr.slice(
+                0,
+                50
+              )}...`
             );
             buffer = Buffer.alloc(0);
             return;
@@ -231,8 +245,6 @@ export async function connectToHost(
         }
         return;
       }
-
-      // Handle protocol messages
       buffer = Buffer.concat([
         buffer,
         typeof data === "string" ? Buffer.from(data) : data,

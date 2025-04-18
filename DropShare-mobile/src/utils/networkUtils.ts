@@ -285,7 +285,6 @@ export const checkTransferLimits = (
     );
     return false;
   }
-
   Logger.info(`Transfer limit check passed for file size ${newFileSize}`);
   return true;
 };
