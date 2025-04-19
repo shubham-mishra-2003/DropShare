@@ -1,21 +1,12 @@
 import React, { createContext, useContext, useState, useEffect } from "react";
-import {
-  startHostServer,
-  stopHostServer,
-  kickClient,
-} from "../service/HostServer";
-import {
-  startClientDiscovery,
-  connectToHost,
-  stopClientDiscovery,
-  disconnectFromHost,
-} from "../service/ClientServer";
+import { HostServer, ClientServer } from "../service/Servers";
 import { Buffer } from "buffer";
 import useUsername from "../hooks/useUsername";
 import { Logger } from "../utils/Logger";
 import TCPSocket from "react-native-tcp-socket";
 import { Vibration } from "react-native";
-import { ClientSharing, HostSharing } from "../service/FileSharing";
+import { ClientSharing, HostSharing } from "./Sharing";
+
 interface NetworkContextType {
   devices: Device[];
   socket: TCPSocket.Server | TCPSocket.Socket | null;
@@ -55,10 +46,15 @@ export const NetworkProvider: React.FC<{ children: React.ReactNode }> = ({
     []
   );
   const { username } = useUsername();
-  const { sendMessageInHost, receiveFileInHost, sendFilesInHost } =
-    HostSharing();
-  const { receiveFileInClient, sendFilesInClient, sendMessageInClient } =
-    ClientSharing();
+  const { sendMessageInHost, sendFilesInHost } = HostSharing();
+  const { sendFilesInClient, sendMessageInClient } = ClientSharing();
+  const { startHostServer, stopHostServer, kickClient } = HostServer();
+  const {
+    startClientDiscovery,
+    stopClientServer,
+    connectToHost,
+    disconnectFromHost,
+  } = ClientServer();
 
   const startHosting = () => {
     setIsHost(true);
@@ -181,7 +177,7 @@ export const NetworkProvider: React.FC<{ children: React.ReactNode }> = ({
   };
 
   const stopClientHandler = () => {
-    stopClientDiscovery();
+    stopClientServer();
     setDevices([]);
     Logger.toast("Client discovery stopped", "info");
   };

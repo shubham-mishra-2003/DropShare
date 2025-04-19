@@ -14,6 +14,7 @@ import { Buffer } from "buffer";
 import { Colors } from "../constants/Colors";
 import { useTheme } from "../hooks/ThemeProvider";
 import MediaPicker from "../components/MediaPicker";
+import Icon from "../components/Icon";
 
 const HostTest: React.FC = () => {
   const { colorScheme } = useTheme();
@@ -100,6 +101,12 @@ const HostTest: React.FC = () => {
             keyExtractor={(item, index) => `${item}-${index}`}
             renderItem={({ item, index }) => (
               <View key={index} style={styles.fileCard}>
+                <Icon
+                  filter={0}
+                  height={20}
+                  width={20}
+                  source={item}
+                />
                 <Text style={styles.fileText}>{item.split("/").pop()}</Text>
               </View>
             )}

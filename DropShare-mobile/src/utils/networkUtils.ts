@@ -214,7 +214,9 @@ interface ChunkDivisionResult {
   numChunks: number;
 }
 
-export const calculateDynamicChunkDivision = (fileSize: number): ChunkDivisionResult => {
+export const calculateDynamicChunkDivision = (
+  fileSize: number
+): ChunkDivisionResult => {
   const MIN_CHUNK_SIZE = 1024; // 1KB
   const MAX_CHUNK_SIZE = 64 * 1024; // 64KB
 
@@ -251,7 +253,7 @@ export const calculateDynamicChunkDivision = (fileSize: number): ChunkDivisionRe
     }
   }
   return { chunkSize, numChunks };
-}
+};
 
 export const checkTransferLimits = (
   newFileSize: number,

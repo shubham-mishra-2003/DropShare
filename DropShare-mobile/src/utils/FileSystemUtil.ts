@@ -285,5 +285,5 @@ export const formatFileSize = (sizeInBytes: number): string => {
   }
 };
 
-export const TEMP_CHUNKS_PATH = `${RNFS.DocumentDirectoryPath}/DropShare/chunks`;
+export const TEMP_CHUNKS_PATH = `${RNFS.TemporaryDirectoryPath}/DropShare/chunks`;
 export const SAVE_PATH = `${RNFS.ExternalStorageDirectoryPath}/DropShare`;
