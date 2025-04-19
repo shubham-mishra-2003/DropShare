@@ -1,4 +1,97 @@
-import React, { useEffect, useRef, useState } from "react";
+// import React, { useEffect, useRef, useState } from "react";
+// import {
+//   BackHandler,
+//   Linking,
+//   Text,
+//   TouchableOpacity,
+//   View,
+// } from "react-native";
+// import { Toast } from "./src/components/Toasts";
+// import { ThemeProvider } from "./src/hooks/ThemeProvider";
+// import RootLayout from "./src/RootLayout";
+// import SplashScreen from "./src/components/SplashScreen";
+// import {
+//   requestPermissions,
+//   verifyAllFilesAccess,
+// } from "./src/utils/permissionRequests";
+
+// export default function App() {
+//   const [permissioned, setPermissioned] = useState(false);
+
+//   const backPressCount = useRef(0);
+//   useEffect(() => {
+//     const backAction = () => {
+//       if (backPressCount.current === 0) {
+//         backPressCount.current += 1;
+//         Toast("Press back again to exit");
+//         setTimeout(() => {
+//           backPressCount.current = 0;
+//         }, 2000);
+//         return true;
+//       }
+//       if (backPressCount.current === 1) {
+//         BackHandler.exitApp();
+//       }
+//       return true;
+//     };
+//     const backHandler = BackHandler.addEventListener(
+//       "hardwareBackPress",
+//       backAction
+//     );
+//     return () => backHandler.remove();
+//   }, []);
+
+//   useEffect(() => {
+//     requestPermissions();
+//     verifyAllFilesAccess().then(() => setPermissioned(true));
+//   }, []);
+
+//   const [isSplashVisible, setIsSplashVisible] = useState(true);
+
+//   return (
+//     <ThemeProvider>
+//       {isSplashVisible ? (
+//         <SplashScreen setIsSplashVisible={setIsSplashVisible} />
+//       ) : permissioned ? (
+//         <RootLayout />
+//       ) : (
+//         <View
+//           style={{
+//             flex: 1,
+//             width: "100%",
+//             backgroundColor: "#000",
+//             justifyContent: "center",
+//             alignItems: "center",
+//             gap: 20,
+//           }}
+//         >
+//           <Text
+//             style={{
+//               fontSize: 25,
+//               color: "#fff",
+//               textAlign: "center",
+//             }}
+//           >
+//             We can't perform without your permissions
+//           </Text>
+//           <TouchableOpacity onPress={() => Linking.openSettings()}>
+//             <Text
+//               style={{
+//                 fontSize: 20,
+//                 color: "#00aff0",
+//                 textDecorationLine: "underline",
+//               }}
+//             >
+//               Give permission
+//             </Text>
+//           </TouchableOpacity>
+//         </View>
+//       )}
+//     </ThemeProvider>
+//   );
+// }
+
+import React, { useEffect, useRef, useState, useCallback } from "react";
 import {
   BackHandler,
   Linking,
@@ -14,13 +107,40 @@ import {
   requestPermissions,
   verifyAllFilesAccess,
 } from "./src/utils/permissionRequests";
-import { startIndexing } from "./src/db/dropshareDb";
-import useSettingsButton from "./src/hooks/useSettingsButton";
 
 export default function App() {
+  const [isLoading, setIsLoading] = useState(true);
   const [permissioned, setPermissioned] = useState(false);
-
+  const [contentLoaded, setContentLoaded] = useState(false);
   const backPressCount = useRef(0);
+
+  const initializeApp = useCallback(async () => {
+    const minSplashDuration = 2200;
+    const start = Date.now();
+
+    try {
+      await Promise.all([
+        requestPermissions(),
+        verifyAllFilesAccess().then((hasAccess) => setPermissioned(hasAccess)),
+      ]);
+    } catch (error) {
+      console.error("Error initializing app:", error);
+      Toast("Failed to initialize app permissions");
+      setPermissioned(false);
+    } finally {
+      const elapsed = Date.now() - start;
+      const remaining = minSplashDuration - elapsed;
+      if (remaining > 0) {
+        await new Promise((resolve) => setTimeout(resolve, remaining));
+      }
+      setContentLoaded(true);
+    }
+  }, []);
+
+  useEffect(() => {
+    initializeApp();
+  }, [initializeApp]);
+
   useEffect(() => {
     const backAction = () => {
       if (backPressCount.current === 0) {
@@ -43,60 +163,65 @@ export default function App() {
     return () => backHandler.remove();
   }, []);
 
-  useEffect(() => {
-    requestPermissions();
-    verifyAllFilesAccess().then(() => setPermissioned(true));
-  }, []);
-
-  const { settings } = useSettingsButton();
-
-  // useEffect(() => {
-  //   if (permissioned) {
-  //     startIndexing(settings.enableSmartSearch);
-  //   }
-  // }, [permissioned, settings.enableSmartSearch]);
-
-  const [isSplashVisible, setIsSplashVisible] = useState(true);
-
   return (
     <ThemeProvider>
-      {isSplashVisible ? (
-        <SplashScreen setIsSplashVisible={setIsSplashVisible} />
-      ) : permissioned ? (
-        <RootLayout />
-      ) : (
-        <View
-          style={{
-            flex: 1,
-            width: "100%",
-            backgroundColor: "#000",
-            justifyContent: "center",
-            alignItems: "center",
-            gap: 20,
-          }}
-        >
-          <Text
+      <View style={{ flex: 1, width: "100%" }}>
+        {/* Always render RootLayout or permission screen in the background */}
+        {permissioned ? (
+          <RootLayout />
+        ) : (
+          <View
             style={{
-              fontSize: 25,
-              color: "#fff",
-              textAlign: "center",
+              flex: 1,
+              width: "100%",
+              backgroundColor: "#000",
+              justifyContent: "center",
+              alignItems: "center",
+              gap: 20,
             }}
           >
-            We can't perform without your permissions
-          </Text>
-          <TouchableOpacity onPress={() => Linking.openSettings()}>
             <Text
               style={{
-                fontSize: 20,
-                color: "#00aff0",
-                textDecorationLine: "underline",
+                fontSize: 25,
+                color: "#fff",
+                textAlign: "center",
               }}
             >
-              Give permission
+              We can't perform without your permissions
             </Text>
-          </TouchableOpacity>
-        </View>
-      )}
+            <TouchableOpacity onPress={() => Linking.openSettings()}>
+              <Text
+                style={{
+                  fontSize: 20,
+                  color: "#00aff0",
+                  textDecorationLine: "underline",
+                }}
+              >
+                Give permission
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity onPress={initializeApp}>
+              <Text
+                style={{
+                  fontSize: 20,
+                  color: "#00aff0",
+                  textDecorationLine: "underline",
+                }}
+              >
+                Retry permissions
+              </Text>
+            </TouchableOpacity>
+          </View>
+        )}
+
+        {/* Show SplashScreen on top until animation completes */}
+        {isLoading && (
+          <SplashScreen
+            contentLoaded={contentLoaded}
+            onAnimationComplete={() => setIsLoading(false)}
+          />
+        )}
+      </View>
     </ThemeProvider>
   );
 }

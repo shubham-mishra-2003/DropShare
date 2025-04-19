@@ -3,27 +3,26 @@ import React, { FC, useCallback, useEffect, useState } from "react";
 import {
   View,
   Text,
-  StyleSheet,
   TouchableOpacity,
   ScrollView,
   Animated,
   Easing,
   Image,
+  BackHandler,
 } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
-import { screenWidth } from "../utils/Constants";
 import { Colors } from "../constants/Colors";
 import { useTheme } from "../hooks/ThemeProvider";
 import { icons, images } from "../assets";
 import Icon from "../components/Icon";
 import BreakerText from "../components/ui/BreakerText";
 import LottieView from "lottie-react-native";
-import { goBack, navigate } from "../utils/NavigationUtil";
+import { goBack, navigate, resetAndNavigate } from "../utils/NavigationUtil";
 import QRScanner from "../components/Sharing/QrScanner";
 import { useNetwork } from "../service/NetworkProvider";
 import { ClientScreenStyles } from "../constants/Styles";
 import StyledText from "../components/ui/StyledText";
 import LinearGradient from "react-native-linear-gradient";
+import { screenWidth } from "../utils/Constants";
 
 const ClientScreen: FC = () => {
   const [isScanner, setIsScanner] = useState(false);
@@ -36,12 +35,24 @@ const ClientScreen: FC = () => {
     connectToHostIp,
     messages,
     receivedFiles,
+    stopClient,
   } = useNetwork();
 
   const [nearbyDevices, setNearbyDevices] = useState<any[]>([]);
 
+  const backAction = () => {
+    stopClient();
+    resetAndNavigate("home");
+    return true;
+  };
+
   useEffect(() => {
     startClient();
+    const backHandler = BackHandler.addEventListener(
+      "hardwareBackPress",
+      backAction
+    );
+    return () => backHandler.remove();
   }, []);
 
   const getRandomPosition = (
@@ -69,10 +80,6 @@ const ClientScreen: FC = () => {
     return position;
   };
 
-  const handleConnect = (ip: string) => {
-    connectToHostIp(ip);
-  };
-
   useEffect(() => {
     setNearbyDevices(
       devices.map((device) => ({
@@ -85,7 +92,7 @@ const ClientScreen: FC = () => {
           nearbyDevices.map((d) => d.position),
           50
         ),
-        scale: new Animated.Value(0),
+        scale: new Animated.Value(1),
       }))
     );
     nearbyDevices.forEach((device) => {
@@ -98,11 +105,11 @@ const ClientScreen: FC = () => {
     });
   }, [devices]);
 
-  // useEffect(() => {
-  //   if (isConnected) {
-  //     navigate("clientConnection", { messages, receivedFiles });
-  //   }
-  // }, [isConnected]);
+  useEffect(() => {
+    if (isConnected) {
+      navigate("clientConnection");
+    }
+  }, [isConnected]);
 
   return (
     <LinearGradient
@@ -112,7 +119,7 @@ const ClientScreen: FC = () => {
       style={styles.container}
     >
       <ScrollView style={{ flex: 1, width: "100%" }}>
-        <TouchableOpacity onPress={() => goBack()} style={styles.backButton}>
+        <TouchableOpacity onPress={backAction} style={styles.backButton}>
           <Icon source={icons.back} height={20} width={20} filter={1} />
         </TouchableOpacity>
         <View style={styles.mainContainer}>
@@ -148,32 +155,30 @@ const ClientScreen: FC = () => {
               />
               {nearbyDevices.map((device) => (
                 <Animated.View
-                  // style={[
-                  //   styles.deviceDot,
-                  //   {
-                  //     transform: [{ scale: device.scale }],
-                  //     left: screenWidth / 2.33 + device.position.x,
-                  //     top: screenWidth / 2.2 + device.position.y,
-                  //   },
-                  // ]}
+                  style={[
+                    styles.deviceDot,
+                    {
+                      transform: [{ scale: device.scale }],
+                      left: screenWidth / 2.5 + device.position.x,
+                      top: screenWidth / 2.5 + device.position.y,
+                    },
+                  ]}
                   key={device.id}
                 >
                   <TouchableOpacity
-                    onPress={() => handleConnect(device.ip)}
+                    onPress={() => connectToHostIp(device.ip)}
                     style={styles.popup}
                   >
                     <Image source={device.image} style={styles.deviceImage} />
-                    <Text style={styles.deviceText}>{device.ip}</Text>
+                    <StyledText
+                      fontSize={12}
+                      fontWeight="bold"
+                      style={styles.deviceText}
+                    >
+                      {device.name}
+                    </StyledText>
                   </TouchableOpacity>
                 </Animated.View>
-              ))}
-              {nearbyDevices.map((device) => (
-                <TouchableOpacity
-                  key={device.ip}
-                  onPress={() => connectToHostIp(device.ip)}
-                >
-                  <StyledText text={device.ip} fontWeight="bold" />
-                </TouchableOpacity>
               ))}
             </View>
             <Image source={images.logo} style={styles.profileImage} />

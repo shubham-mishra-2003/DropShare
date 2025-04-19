@@ -1,4 +1,4 @@
-import React, { useRef, useState, useEffect } from "react";
+import React, { useRef, useState, useEffect, useCallback } from "react";
 import {
   View,
   FlatList,
@@ -6,8 +6,9 @@ import {
   Dimensions,
   Text,
   TouchableOpacity,
-  Platform,
   StyleSheet,
+  ActivityIndicator,
+  Animated,
 } from "react-native";
 import Video from "react-native-video";
 import Pdf from "react-native-pdf";
@@ -18,6 +19,8 @@ import { goBack } from "../../utils/NavigationUtil";
 import Header from "../ui/Header";
 import { icons } from "../../assets";
 import useSelectFile from "../../hooks/useSelectFile";
+import Icon from "../Icon";
+import { Gesture, GestureDetector } from "react-native-gesture-handler";
 
 type RootStackParamList = {
   FileViewer: { files: any[]; currentIndex: number };
@@ -25,17 +28,38 @@ type RootStackParamList = {
 
 const { width, height } = Dimensions.get("window");
 
+const sanitizeFile = (file: any) => ({
+  ...file,
+  path: file.path,
+  name: file.name,
+  mtime: file.mtime instanceof Date ? file.mtime.toISOString() : file.mtime,
+});
+
 const FileViewer: React.FC = () => {
   const route = useRoute<RouteProp<RootStackParamList, "FileViewer">>();
-  const { files, currentIndex } = route.params;
+  const { files: rawFiles, currentIndex } = route.params;
+  const files = rawFiles.map(sanitizeFile);
   const { setSelectedFiles } = useSelectFile();
   const { colorScheme } = useTheme();
   const styles = FilesViewerStyles(colorScheme);
   const flatListRef = useRef<FlatList>(null);
+  const pdfRef = useRef<Pdf>(null);
   const [currentFileIndex, setCurrentFileIndex] = useState(currentIndex);
+  const [isLoading, setIsLoading] = useState(false);
+  const loadingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  const scale = useRef(new Animated.Value(1)).current;
+  const translateX = useRef(new Animated.Value(0)).current;
+  const translateY = useRef(new Animated.Value(0)).current;
+  const [savedScale, setSavedScale] = useState(1);
+  const [savedTranslateX, setSavedTranslateX] = useState(0);
+  const [savedTranslateY, setSavedTranslateY] = useState(0);
 
   useEffect(() => {
-    console.log("FileViewer params:", { filesLength: files?.length, currentIndex });
+    console.log("FileViewer params:", {
+      filesLength: files?.length,
+      currentIndex,
+    });
   }, [files, currentIndex]);
 
   useEffect(() => {
@@ -44,6 +68,33 @@ const FileViewer: React.FC = () => {
       goBack();
     }
   }, [files]);
+
+  useEffect(() => {
+    setIsLoading(true);
+    if (loadingTimeoutRef.current) {
+      clearTimeout(loadingTimeoutRef.current);
+    }
+    loadingTimeoutRef.current = setTimeout(() => {
+      setIsLoading(false);
+      console.log(
+        "Loading timeout triggered for file index:",
+        currentFileIndex
+      );
+    }, 8000);
+
+    scale.setValue(1);
+    translateX.setValue(0);
+    translateY.setValue(0);
+    setSavedScale(1);
+    setSavedTranslateX(0);
+    setSavedTranslateY(0);
+
+    return () => {
+      if (loadingTimeoutRef.current) {
+        clearTimeout(loadingTimeoutRef.current);
+      }
+    };
+  }, [currentFileIndex]);
 
   if (!files || files.length === 0) {
     return null;
@@ -65,121 +116,245 @@ const FileViewer: React.FC = () => {
   );
   const isPdf = fileExtension === "pdf";
 
-  // Log current file details
-  // useEffect(() => {
-  //   console.log("Current file:", {
-  //     path: filePath,
-  //     extension: fileExtension,
-  //     isImage,
-  //     isVideo,
-  //     isAudio,
-  //     isPdf,
-  //   });
-  // }, [currentFileIndex, filePath, fileExtension]);
-
   const onClose = () => {
     console.log("Closing FileViewer");
     goBack();
     setSelectedFiles([]);
   };
 
-  const renderItem = ({ item, index }: { item: any; index: number }) => {
-    const itemPath = item.path.startsWith("file://")
-      ? item.path
-      : `file://${item.path}`;
-    const itemExtension = item.name.split(".").pop()?.toLowerCase();
-    const isItemImage = ["jpg", "jpeg", "png", "gif", "bmp", "webp"].includes(
-      itemExtension || ""
-    );
-    const isItemVideo = ["mp4", "mov", "avi", "mkv", "webm"].includes(
-      itemExtension || ""
-    );
-    const isItemAudio = ["mp3", "wav", "aac", "ogg", "m4a"].includes(
-      itemExtension || ""
-    );
-    const isItemPdf = itemExtension === "pdf";
+  const pinchGesture = Gesture.Pinch()
+    .onUpdate((event) => {
+      const newScale = savedScale * event.scale;
+      scale.setValue(newScale);
+    })
+    .onEnd(() => {
+      const currentScale = savedScale * (scale as any)._value;
+      setSavedScale(currentScale);
+      if (currentScale < 1) {
+        Animated.spring(scale, {
+          toValue: 1,
+          useNativeDriver: true,
+        }).start(() => setSavedScale(1));
+        Animated.spring(translateX, {
+          toValue: 0,
+          useNativeDriver: true,
+        }).start(() => setSavedTranslateX(0));
+        Animated.spring(translateY, {
+          toValue: 0,
+          useNativeDriver: true,
+        }).start(() => setSavedTranslateY(0));
+      }
+    });
 
-    // Log rendering details
-    // console.log("Rendering item:", {
-    //   path: itemPath,
-    //   extension: itemExtension,
-    //   isImage: isItemImage,
-    //   isVideo: isItemVideo,
-    //   isAudio: isItemAudio,
-    //   isPdf: isItemPdf,
-    //   index,
-    //   isActive: index === currentFileIndex,
-    // });
+  const panGesture = Gesture.Pan()
+    .enabled(savedScale > 1)
+    .onUpdate((event) => {
+      if (savedScale > 1) {
+        translateX.setValue(savedTranslateX + event.translationX / savedScale);
+        translateY.setValue(savedTranslateY + event.translationY / savedScale);
+      }
+    })
+    .onEnd(() => {
+      setSavedTranslateX((translateX as any)._value);
+      setSavedTranslateY((translateY as any)._value);
+    });
 
-    return (
-      <View style={localStyles.itemContainer}>
-        {isItemImage && (
-          <Image
-            source={{ uri: itemPath }}
-            style={localStyles.media}
-            resizeMode="contain"
-            onError={(e) => console.error("Image error:", JSON.stringify(e))}
-            onLoad={() => console.log("Image loaded:", itemPath)}
-          />
-        )}
-        {isItemVideo && (
-          <Video
-            source={{ uri: itemPath }}
-            style={localStyles.media}
-            controls
-            resizeMode="contain"
-            onError={(e) => console.error("Video error:", JSON.stringify(e))}
-            onLoad={(data) => console.log("Video loaded:", JSON.stringify(data))}
-            paused={index !== currentFileIndex}
-          />
-        )}
-        {isItemAudio && (
-          <View style={localStyles.audioContainer}>
-            <Image
-              source={icons.audio}
-              style={localStyles.audioIcon}
-              resizeMode="contain"
-            />
-            <Video
-              source={{ uri: itemPath }}
-              controls
-              style={localStyles.audioPlayer}
-              onError={(e) => console.error("Audio error:", JSON.stringify(e))}
-              onLoad={(data) => console.log("Audio loaded:", JSON.stringify(data))}
-              paused={index !== currentFileIndex}
-            />
-          </View>
-        )}
-        {isItemPdf && (
-          <Pdf
-            source={{ uri: itemPath, cache: false }}
-            style={localStyles.media}
-            onError={(e) => console.error("PDF error:", JSON.stringify(e))}
-            onLoadComplete={(pages) =>
-              console.log("PDF loaded, pages:", pages)
-            }
-          />
-        )}
-        {!isItemImage && !isItemVideo && !isItemAudio && !isItemPdf && (
-          <View style={localStyles.unsupportedContainer}>
-            <Text style={localStyles.unsupportedText}>
-              Unsupported file type: {item.name}
-            </Text>
-          </View>
-        )}
-      </View>
-    );
+  const composedGestures = Gesture.Simultaneous(pinchGesture, panGesture);
+
+  const animatedStyle = {
+    transform: [{ scale }, { translateX }, { translateY }],
   };
+
+  const renderItem = useCallback(
+    ({ item, index }: { item: any; index: number }) => {
+      const itemPath = item.path.startsWith("file://")
+        ? item.path
+        : `file://${item.path}`;
+      const itemExtension = item.name.split(".").pop()?.toLowerCase();
+      const isItemImage = ["jpg", "jpeg", "png", "gif", "bmp", "webp"].includes(
+        itemExtension || ""
+      );
+      const isItemVideo = ["mp4", "mov", "avi", "mkv", "webm"].includes(
+        itemExtension || ""
+      );
+      const isItemAudio = ["mp3", "wav", "aac", "ogg", "m4a"].includes(
+        itemExtension || ""
+      );
+      const isItemPdf = itemExtension === "pdf";
+
+      if (Math.abs(index - currentFileIndex) > 1) {
+        return <View style={localStyles.itemContainer} />;
+      }
+
+      return (
+        <View style={localStyles.itemContainer}>
+          {isLoading && index === currentFileIndex && (
+            <ActivityIndicator
+              size="large"
+              color="#fff"
+              style={localStyles.loader}
+            />
+          )}
+          {(isItemImage || isItemVideo || isItemPdf) && (
+            <GestureDetector gesture={composedGestures}>
+              <Animated.View
+                style={[localStyles.mediaContainer, animatedStyle]}
+              >
+                {isItemImage && (
+                  <Image
+                    source={{ uri: itemPath }}
+                    style={localStyles.media}
+                    resizeMode="contain"
+                    onError={() => {
+                      setIsLoading(false);
+                      if (loadingTimeoutRef.current) {
+                        clearTimeout(loadingTimeoutRef.current);
+                      }
+                    }}
+                    onLoad={() => {
+                      setIsLoading(false);
+                      if (loadingTimeoutRef.current) {
+                        clearTimeout(loadingTimeoutRef.current);
+                      }
+                    }}
+                  />
+                )}
+                {isItemVideo && (
+                  <Video
+                    source={{ uri: itemPath }}
+                    style={localStyles.media}
+                    controls
+                    resizeMode="contain"
+                    onError={() => {
+                      setIsLoading(false);
+                      if (loadingTimeoutRef.current) {
+                        clearTimeout(loadingTimeoutRef.current);
+                      }
+                    }}
+                    onLoad={() => {
+                      setIsLoading(false);
+                      if (loadingTimeoutRef.current) {
+                        clearTimeout(loadingTimeoutRef.current);
+                      }
+                    }}
+                    paused={index !== currentFileIndex}
+                    bufferConfig={{
+                      minBufferMs: 300,
+                      maxBufferMs: 600,
+                      bufferForPlaybackMs: 150,
+                      bufferForPlaybackAfterRebufferMs: 300,
+                    }}
+                    maxBitRate={1000000}
+                    useTextureView={false}
+                    playInBackground={false}
+                  />
+                )}
+                {isItemPdf && (
+                  <Pdf
+                    ref={pdfRef}
+                    source={{ uri: itemPath, cache: false }}
+                    style={localStyles.media}
+                    enablePaging
+                    onError={() => {
+                      setIsLoading(false);
+                      if (loadingTimeoutRef.current) {
+                        clearTimeout(loadingTimeoutRef.current);
+                      }
+                    }}
+                    onLoadComplete={() => {
+                      setIsLoading(false);
+                      if (loadingTimeoutRef.current) {
+                        clearTimeout(loadingTimeoutRef.current);
+                      }
+                    }}
+                    onLoadProgress={(percent) => {
+                      setIsLoading(percent < 1);
+                    }}
+                    onPageChanged={() => {
+                      setIsLoading(false);
+                    }}
+                  />
+                )}
+              </Animated.View>
+            </GestureDetector>
+          )}
+          {isItemAudio && (
+            <View style={localStyles.audioContainer}>
+              <Icon source={icons.audio} filter={1} height={100} width={100} />
+              <Video
+                source={{ uri: itemPath }}
+                controls
+                style={localStyles.audioPlayer}
+                onError={() => {
+                  setIsLoading(false);
+                  if (loadingTimeoutRef.current) {
+                    clearTimeout(loadingTimeoutRef.current);
+                  }
+                }}
+                onLoad={() => {
+                  setIsLoading(false);
+                  if (loadingTimeoutRef.current) {
+                    clearTimeout(loadingTimeoutRef.current);
+                  }
+                }}
+                paused={index !== currentFileIndex}
+                bufferConfig={{
+                  minBufferMs: 1000,
+                  maxBufferMs: 2000,
+                  bufferForPlaybackMs: 500,
+                  bufferForPlaybackAfterRebufferMs: 1000,
+                }}
+              />
+            </View>
+          )}
+          {!isItemImage && !isItemVideo && !isItemAudio && !isItemPdf && (
+            <View style={localStyles.unsupportedContainer}>
+              <Text style={localStyles.unsupportedText}>
+                Unsupported file type: {item.name}
+              </Text>
+            </View>
+          )}
+        </View>
+      );
+    },
+    [currentFileIndex, isLoading, composedGestures]
+  );
 
   const onViewableItemsChanged = useRef(({ viewableItems }: any) => {
     if (viewableItems.length > 0) {
       const newIndex = viewableItems[0].index;
       if (newIndex !== null && newIndex !== undefined) {
-        // console.log("Swiped to index:", newIndex);
         setCurrentFileIndex(newIndex);
       }
     }
   }).current;
+
+  useEffect(() => {
+    const preloadItems = () => {
+      const preloadIndices = [
+        currentFileIndex - 1,
+        currentFileIndex,
+        currentFileIndex + 1,
+      ].filter((index) => index >= 0 && index < files.length);
+
+      preloadIndices.forEach((index) => {
+        const file = files[index];
+        const itemPath = file.path.startsWith("file://")
+          ? file.path
+          : `file://${file.path}`;
+        const itemExtension = file.name.split(".").pop()?.toLowerCase();
+        if (
+          ["jpg", "jpeg", "png", "gif", "bmp", "webp"].includes(
+            itemExtension || ""
+          )
+        ) {
+          Image.prefetch(itemPath);
+        }
+      });
+    };
+
+    preloadItems();
+  }, [currentFileIndex, files]);
 
   return (
     <View style={styles.container}>
@@ -207,6 +382,9 @@ const FileViewer: React.FC = () => {
           itemVisiblePercentThreshold: 50,
         }}
         keyExtractor={(item) => item.path}
+        initialNumToRender={3}
+        maxToRenderPerBatch={3}
+        windowSize={3}
       />
       <View style={localStyles.navigationButtons}>
         <TouchableOpacity
@@ -255,6 +433,10 @@ const localStyles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
   },
+  mediaContainer: {
+    width: "100%",
+    height: "100%",
+  },
   media: {
     width: "100%",
     height: "100%",
@@ -263,11 +445,6 @@ const localStyles = StyleSheet.create({
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
-  },
-  audioIcon: {
-    width: 100,
-    height: 100,
-    marginBottom: 20,
   },
   audioPlayer: {
     width: width - 40,
@@ -302,6 +479,10 @@ const localStyles = StyleSheet.create({
   },
   disabledButton: {
     opacity: 0.5,
+  },
+  loader: {
+    position: "absolute",
+    zIndex: 1,
   },
 });
 

@@ -34,10 +34,12 @@ const ConnectionScreen: FC = () => {
     receivedFiles,
     sentFiles,
     sendMessage,
-    sendFile,
+    sendFiles,
     disconnect,
-    isConnected,
     isHost,
+    isHostConnected,
+    isClientConnected,
+    kickClient,
   } = useNetwork();
 
   const [fileSelectorOpen, setFileSelectorOpen] = useState(false);
@@ -78,6 +80,10 @@ const ConnectionScreen: FC = () => {
     resetAndNavigate("home");
   };
 
+  const handleKickClient = () => {
+    kickClient(devices[devices.length - 1].ip);
+  };
+
   return (
     <LinearGradient
       start={{ x: 0, y: 0 }}
@@ -85,7 +91,6 @@ const ConnectionScreen: FC = () => {
       colors={Colors[colorScheme].linearGradientColors}
       style={styles.main}
     >
-      {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity
           style={styles.headerButton}
@@ -105,7 +110,6 @@ const ConnectionScreen: FC = () => {
         </TouchableOpacity>
       </View>
 
-      {/* Devices Section */}
       <View style={{ padding: 15, gap: 10 }}>
         <StyledText
           fontSize={22}
@@ -130,11 +134,7 @@ const ConnectionScreen: FC = () => {
                 {item.name} ({item.ip})
               </StyledText>
               {isHost && (
-                <TouchableOpacity
-                  onPress={() => {
-                    /* TODO: removeClient */
-                  }}
-                >
+                <TouchableOpacity onPress={() => kickClient(item.ip)}>
                   <Icon
                     source={icons.cross}
                     filter={1}
@@ -147,40 +147,6 @@ const ConnectionScreen: FC = () => {
           )}
         />
       </View>
-
-      {/* Transfer Progress */}
-      {transferProgress.percentage > 0 && (
-        <View
-          style={{
-            padding: 15,
-            backgroundColor: Colors[colorScheme].itemBackground,
-            borderRadius: 10,
-            marginHorizontal: 15,
-          }}
-        >
-          <StyledText
-            fontSize={16}
-            fontWeight="bold"
-            text="Transfer Progress"
-          />
-          <StyledText
-            text={`${transferProgress.progress} (${transferProgress.speed})`}
-          />
-          {/* {Platform.OS === "android" ? (
-            <ProgressBarAndroid
-              styleAttr="Horizontal"
-              indeterminate={false}
-              progress={transferProgress.percentage / 100}
-              color={Colors[colorScheme].tint}
-            />
-          ) : (
-            <ProgressViewIOS
-              progress={transferProgress.percentage / 100}
-              progressTintColor={Colors[colorScheme].tint}
-            />
-          )} */}
-        </View>
-      )}
 
       {/* Files Section */}
       <FlatList

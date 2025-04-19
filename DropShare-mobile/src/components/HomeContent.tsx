@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from "react";
+import React, { useState, useCallback, useEffect, useRef } from "react";
 import { View, Text, TouchableOpacity, ScrollView } from "react-native";
 import { useFocusEffect } from "@react-navigation/native";
 import { navigate } from "../utils/NavigationUtil";
@@ -29,41 +29,78 @@ const HomeContent: React.FC = () => {
   const styles = filesStyle(colorScheme);
   const [refresh, setRefresh] = useState(false);
   const [fileCounts, setFileCounts] = useState<FileCounts>({});
-
   const [storage, setStorage] = useState({
     used: 0,
     total: 1,
     usedPercentage: 0,
     free: 1,
   });
+  const [search, setSearch] = useState(false);
+  const cacheRef = useRef<{
+    storage?: typeof storage;
+    fileCounts?: FileCounts;
+    lastFetch?: number;
+  }>({});
+  const isFetchingRef = useRef(false);
 
-  const fetchData = async () => {
+  const fetchData = useCallback(async (forceRefresh = false) => {
+    if (isFetchingRef.current) return;
+    const now = Date.now();
+    if (
+      !forceRefresh &&
+      cacheRef.current.storage &&
+      cacheRef.current.fileCounts &&
+      cacheRef.current.lastFetch &&
+      now - cacheRef.current.lastFetch < 30000
+    ) {
+      setStorage(cacheRef.current.storage);
+      setFileCounts(cacheRef.current.fileCounts);
+      return;
+    }
+
+    isFetchingRef.current = true;
     try {
-      const storageInfo = await getStorageInfo();
-      const fileCounts = await getFileCounts();
-      let storagePercentage =
+      const [storageInfo, fileCounts] = await Promise.all([
+        getStorageInfo(),
+        getFileCounts(),
+      ]);
+      const storagePercentage =
         storageInfo.total > 0
           ? (storageInfo.used / storageInfo.total) * 100
           : 0;
+      const freeSpace = storageInfo.total - storageInfo.used;
 
-      let freeSpace = storageInfo.total - storageInfo.used;
-
-      setStorage({
+      const newStorage = {
         used: storageInfo.used,
         total: storageInfo.total,
         usedPercentage: storagePercentage,
         free: freeSpace,
-      });
+      };
+
+      setStorage(newStorage);
       setFileCounts(fileCounts);
       setRefresh((prev) => !prev);
+
+      cacheRef.current = {
+        storage: newStorage,
+        fileCounts,
+        lastFetch: now,
+      };
     } catch (error) {
       console.error("Error fetching data:", error);
+    } finally {
+      isFetchingRef.current = false;
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
+
   useFocusEffect(
     useCallback(() => {
       fetchData();
-    }, [])
+    }, [fetchData])
   );
 
   const categories: Category[] = [
@@ -75,8 +112,6 @@ const HomeContent: React.FC = () => {
     { name: "Archives", icon: icons.archive, color: "#8D6E63" },
   ];
 
-  const [search, setSearch] = useState(false);
-
   return (
     <LinearGradient
       start={{ x: 0, y: 0 }}
@@ -84,27 +119,29 @@ const HomeContent: React.FC = () => {
       colors={Colors[colorScheme].linearGradientColors}
       style={styles.mainView}
     >
+      <TouchableOpacity onPress={() => navigate("testhost")}>
+        <StyledText fontSize={20} fontWeight="bold">
+          Test Host
+        </StyledText>
+      </TouchableOpacity>
+      <TouchableOpacity onPress={() => navigate("testclient")}>
+        <StyledText fontSize={20} fontWeight="bold">
+          Test Client
+        </StyledText>
+      </TouchableOpacity>
+      <TouchableOpacity onPress={() => navigate("hostConnection")}>
+        <StyledText fontSize={25}>Host Connection</StyledText>
+      </TouchableOpacity>
+      <TouchableOpacity onPress={() => navigate("clientConnection")}>
+        <StyledText fontSize={25}>Client Connection</StyledText>
+      </TouchableOpacity>
+      <View style={{ paddingHorizontal: 10 }}>
+        <StyledText text="Files" fontWeight="bold" fontSize={55} />
+      </View>
       <ScrollView
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ paddingHorizontal: 12, gap: 15 }}
+        contentContainerStyle={{ paddingHorizontal: 12, gap: 10 }}
       >
-        <TouchableOpacity onPress={() => navigate("testhost")}>
-          <StyledText fontSize={20} fontWeight="bold">
-            Test Host
-          </StyledText>
-        </TouchableOpacity>
-        <TouchableOpacity onPress={() => navigate("testclient")}>
-          <StyledText fontSize={20} fontWeight="bold">
-            Test client
-          </StyledText>
-        </TouchableOpacity>
-        <TouchableOpacity onPress={() => navigate("hostConnection")}>
-          <StyledText fontSize={25}>Host connection</StyledText>
-        </TouchableOpacity>
-        <TouchableOpacity onPress={() => navigate("clientConnection")}>
-          <StyledText fontSize={25}>Client connection</StyledText>
-        </TouchableOpacity>
-        <StyledText text="Files" fontWeight="bold" fontSize={55} />
         <TouchableOpacity
           onPress={() => setSearch(true)}
           style={{
@@ -136,9 +173,9 @@ const HomeContent: React.FC = () => {
           <StyledText fontSize={25} text="Device Storage" fontWeight="bold" />
           <View style={styles.storageInfo}>
             <StyledText fontWeight="bold" fontSize={22}>
-              {storage.used} GB |{" "}
+              {storage.used.toFixed(2)} GB |{" "}
               <StyledText fontWeight="bold" fontSize={26}>
-                {storage.total} GB
+                {storage.total.toFixed(2)} GB
               </StyledText>
             </StyledText>
             <View style={styles.Bar}>
@@ -156,7 +193,7 @@ const HomeContent: React.FC = () => {
               fontSize={22}
               style={{ color: Colors[colorScheme].text }}
             >
-              Free : {storage.free.toFixed(2)} GB
+              Free: {storage.free.toFixed(2)} GB
             </StyledText>
           </View>
         </TouchableOpacity>
@@ -189,7 +226,9 @@ const HomeContent: React.FC = () => {
             >
               <StyledText text={item.name} fontWeight="bold" />
               <Icon source={item.icon} height={20} width={20} filter={1} />
-              <StyledText fontWeight="bold">{fileCounts[item.name]}</StyledText>
+              <StyledText fontWeight="bold">
+                {fileCounts[item.name] || 0}
+              </StyledText>
             </TouchableOpacity>
           ))}
         </View>
@@ -199,4 +238,4 @@ const HomeContent: React.FC = () => {
   );
 };
 
-export default HomeContent;
+export default React.memo(HomeContent);

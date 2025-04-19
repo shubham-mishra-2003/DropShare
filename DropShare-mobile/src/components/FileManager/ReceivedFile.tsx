@@ -1,12 +1,12 @@
 import {
   ActivityIndicator,
   Image,
+  RefreshControl,
   ScrollView,
-  Text,
   TouchableOpacity,
   View,
 } from "react-native";
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useCallback, useRef } from "react";
 import RNFS from "react-native-fs";
 import { Colors } from "../../constants/Colors";
 import { useTheme } from "../../hooks/ThemeProvider";
@@ -14,35 +14,93 @@ import Header from "../ui/Header";
 import { goBack, navigate } from "../../utils/NavigationUtil";
 import useSelectFile from "../../hooks/useSelectFile";
 import { FilesStyles } from "../../constants/Styles";
-import { formatFileSize, savePath } from "../../utils/FileSystemUtil";
-import { Toast } from "../Toasts";
+import { formatFileSize, SAVE_PATH } from "../../utils/FileSystemUtil";
 import LinearGradient from "react-native-linear-gradient";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import StyledText from "../ui/StyledText";
+import { icons } from "../../assets";
 
-const ReceivedFile = () => {
+const ReceivedFile: React.FC = () => {
   const [receivedFiles, setReceivedFiles] = useState<RNFS.ReadDirItem[]>([]);
-  const { colorScheme } = useTheme();
   const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    setLoading(true);
-    const fetchFiles = async () => {
-      const folderExists = await RNFS.exists(savePath);
-      if (!folderExists) {
-        RNFS.mkdir(savePath);
-      } else {
-        RNFS.readDir(savePath)
-          .then((receivedFile) => {
-            setReceivedFiles(receivedFile);
-            setLoading(false);
-          })
-          .catch((error) => Toast(error));
-      }
-    };
-    fetchFiles();
-  }, []);
-
+  const { colorScheme } = useTheme();
   const styles = FilesStyles(colorScheme);
   const { selectedFiles, setSelectedFiles } = useSelectFile();
+  const cacheRef = useRef<{
+    files?: RNFS.ReadDirItem[];
+    lastModified?: number;
+  }>({});
+  const isFetchingRef = useRef(false);
+
+  const fetchFiles = useCallback(async (forceRefresh = false) => {
+    if (isFetchingRef.current) return;
+    isFetchingRef.current = true;
+    setLoading(true);
+
+    try {
+      const folderExists = await RNFS.exists(SAVE_PATH);
+      if (!folderExists) {
+        await RNFS.mkdir(SAVE_PATH);
+        setReceivedFiles([]);
+        cacheRef.current = { files: [], lastModified: Date.now() };
+        await AsyncStorage.setItem("received_files", JSON.stringify([]));
+        return;
+      }
+      const stat = await RNFS.stat(SAVE_PATH);
+      const lastModified = stat.mtime || Date.now();
+      if (
+        !forceRefresh &&
+        cacheRef.current.files &&
+        cacheRef.current.lastModified &&
+        cacheRef.current.lastModified >= lastModified
+      ) {
+        setReceivedFiles(cacheRef.current.files);
+        setLoading(false);
+        isFetchingRef.current = false;
+        return;
+      }
+
+      const cachedData = await AsyncStorage.getItem("received_files");
+      const cachedModified = await AsyncStorage.getItem(
+        "received_files_lastModified"
+      );
+      if (
+        cachedData &&
+        cachedModified &&
+        parseInt(cachedModified) >= lastModified &&
+        !forceRefresh
+      ) {
+        const files = JSON.parse(cachedData);
+        cacheRef.current = { files, lastModified: parseInt(cachedModified) };
+        setReceivedFiles(files);
+        setLoading(false);
+        isFetchingRef.current = false;
+        return;
+      }
+
+      const receivedFile = await RNFS.readDir(SAVE_PATH);
+      setReceivedFiles(receivedFile);
+      cacheRef.current = { files: receivedFile, lastModified };
+
+      await AsyncStorage.setItem(
+        "received_files",
+        JSON.stringify(receivedFile)
+      );
+      await AsyncStorage.setItem(
+        "received_files_lastModified",
+        lastModified.toString()
+      );
+    } catch (error) {
+      console.error("Error fetching files:", error);
+    } finally {
+      setLoading(false);
+      isFetchingRef.current = false;
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchFiles();
+  }, [fetchFiles]);
 
   return (
     <LinearGradient
@@ -51,7 +109,6 @@ const ReceivedFile = () => {
       colors={Colors[colorScheme].linearGradientColors}
       style={{
         flex: 1,
-        backgroundColor: Colors[colorScheme].background,
         width: "100%",
       }}
     >
@@ -59,9 +116,19 @@ const ReceivedFile = () => {
       {loading ? (
         <ActivityIndicator color={Colors[colorScheme].tint} size="large" />
       ) : (
-        <ScrollView contentContainerStyle={styles.scrollContainer}>
-          {receivedFiles.length == 0 ? (
-            <Text
+        <ScrollView
+          contentContainerStyle={styles.scrollContainer}
+          refreshControl={
+            <RefreshControl
+              refreshing={loading}
+              onRefresh={() => fetchFiles(true)}
+              progressBackgroundColor={Colors[colorScheme].background}
+              colors={[Colors[colorScheme].tint]}
+            />
+          }
+        >
+          {receivedFiles.length === 0 ? (
+            <StyledText
               style={{
                 fontSize: 15,
                 fontWeight: "bold",
@@ -70,8 +137,8 @@ const ReceivedFile = () => {
                 marginTop: 20,
               }}
             >
-              No files found in the Folder
-            </Text>
+              No files found in the folder
+            </StyledText>
           ) : (
             <View style={styles.filesView}>
               {receivedFiles.map((file) => (
@@ -96,9 +163,15 @@ const ReceivedFile = () => {
                       });
                     }
                   }}
-                  onLongPress={() =>
-                    setSelectedFiles((prev) => [...prev, file])
-                  }
+                  onLongPress={() => {
+                    if (
+                      !selectedFiles.some(
+                        (selected) => selected.path === file.path
+                      )
+                    ) {
+                      setSelectedFiles((prev) => [...prev, file]);
+                    }
+                  }}
                   style={styles.fileItem}
                   key={file.path}
                 >
@@ -107,7 +180,17 @@ const ReceivedFile = () => {
                     style={styles.image}
                   />
                   <View style={styles.textView}>
-                    <Text style={styles.text}>{formatFileSize(file.size)}</Text>
+                    <StyledText
+                      isEllipsis
+                      fontSize={20}
+                      text={file.name}
+                      fontWeight="bold"
+                    />
+                    <StyledText
+                      fontSize={14}
+                      text={formatFileSize(file.size)}
+                      fontWeight="regular"
+                    />
                   </View>
                 </TouchableOpacity>
               ))}
@@ -119,4 +202,4 @@ const ReceivedFile = () => {
   );
 };
 
-export default ReceivedFile;
+export default React.memo(ReceivedFile);

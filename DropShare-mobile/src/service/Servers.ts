@@ -7,7 +7,8 @@ import { Buffer } from "buffer";
 import { Logger } from "../utils/Logger";
 import { ERROR_CODES } from "../utils/Error";
 import TCPSocket from "react-native-tcp-socket";
-import { HostSharing, ClientSharing } from "./Sharing";
+import { HostSharing } from "./HostSharing";
+import { ClientSharing } from "./ClientSharing";
 
 const UDP_PORT = 5000;
 const TCP_PORT = 6000;
@@ -23,21 +24,26 @@ let server: TCPSocket.Server | null = null;
 let clientSocket: TCPSocket.Socket | null = null;
 
 export const HostServer = () => {
+  let setDevicesRef: React.Dispatch<React.SetStateAction<Device[]>> | null =
+    null;
+
   async function startHostServer(
     username: string,
+    setConnected: React.Dispatch<React.SetStateAction<boolean>>,
     setDevices: React.Dispatch<React.SetStateAction<Device[]>>,
     setSocket: React.Dispatch<React.SetStateAction<TCPSocket.Server | null>>,
     setMessages: React.Dispatch<React.SetStateAction<string[]>>,
     setReceivedFiles: React.Dispatch<React.SetStateAction<string[]>>,
     setTransferProgress?: React.Dispatch<
       React.SetStateAction<TransferProgress[]>
-    >
+    >,
   ): Promise<void> {
     if (isServerRunning) {
       Logger.info("Host server already running, skipping start.");
       return;
     }
     isServerRunning = true;
+    setDevicesRef = setDevices;
 
     try {
       const ip = await getLocalIPAddress();
@@ -78,6 +84,7 @@ export const HostServer = () => {
 
       server = new TCPSocket.Server();
       server.on("connection", (socket: ConnectedSocket) => {
+        setConnected(true);
         if (connectedSockets.length >= MAX_CLIENTS) {
           socket.write(
             Buffer.from(`ERROR:${ERROR_CODES.MAX_CLIENTS_REACHED}\n`)
@@ -101,13 +108,43 @@ export const HostServer = () => {
 
         socket.on("data", (data) => {
           const { receiveFileInHost } = HostSharing();
-          receiveFileInHost({
-            data,
-            setMessages,
-            setReceivedFiles,
-            socket,
-            setTransferProgress,
-          });
+          try {
+            const message = data.toString().trim();
+            if (message.startsWith("{")) {
+              const parsed = JSON.parse(message);
+              if (parsed.type === "init" && parsed.name) {
+                setDevices((prev) =>
+                  prev.map((d) =>
+                    d.ip === socket.remoteAddress
+                      ? { ...d, name: parsed.name }
+                      : d
+                  )
+                );
+                Logger.info(
+                  `Client ${socket.remoteAddress} identified as ${parsed.name}`
+                );
+                return;
+              }
+            }
+            receiveFileInHost({
+              data,
+              ip: socket.remoteAddress || "Unknown",
+              setMessages,
+              setReceivedFiles,
+              socket,
+              setTransferProgress,
+            });
+          } catch (error) {
+            Logger.error("Error processing client data", error);
+            receiveFileInHost({
+              data,
+              ip: socket.remoteAddress || "Unknown",
+              setMessages,
+              setReceivedFiles,
+              socket,
+              setTransferProgress,
+            });
+          }
         });
 
         socket.on("close", () => {
@@ -158,14 +195,35 @@ export const HostServer = () => {
       Logger.info("Host UDP socket closed");
     }
     isServerRunning = false;
+    setDevicesRef = null;
   }
 
   function kickClient(clientIp: string): void {
-    connectedSockets.forEach((socket) => {
-      if (socket.remoteAddress === clientIp) {
-        socket.destroy();
-      }
+    if (!setDevicesRef) {
+      Logger.warn("Cannot kick client: setDevices not initialized");
+      return;
+    }
+
+    const socketsToKick = connectedSockets.filter(
+      (socket) => socket.remoteAddress === clientIp
+    );
+    if (socketsToKick.length === 0) {
+      Logger.warn(`No client found with IP: ${clientIp}`);
+      return;
+    }
+
+    socketsToKick.forEach((socket) => {
+      Logger.info(`Kicking client: ${clientIp}`);
+      socket.destroy();
     });
+
+    connectedSockets = connectedSockets.filter(
+      (socket) => socket.remoteAddress !== clientIp
+    );
+    setDevicesRef((prev) => prev.filter((d) => d.ip !== clientIp));
+    Logger.info(
+      `Client ${clientIp} removed from connected sockets and devices`
+    );
   }
 
   return {
@@ -199,11 +257,11 @@ export const ClientServer = () => {
               ...prev.filter((device) => device.ip !== data.ip),
               {
                 ip: data.ip,
-                name: rinfo.name,
+                name: data.name || "Unknown",
                 role: "Host",
               },
             ]);
-            // Logger.info(`Discovered host: ${data.ip} (${data.name})`);
+            Logger.info(`Discovered host: ${data.ip} (${data.name})`);
           }
         } catch (error) {
           Logger.error("Error parsing UDP message", error);
@@ -248,6 +306,8 @@ export const ClientServer = () => {
       Logger.info("Connected to host!");
       setConnected(true);
       setSocket(client);
+      const initMessage = JSON.stringify({ type: "init", name: username });
+      client.write(Buffer.from(initMessage + "\n"));
     });
 
     client.on("data", (data: string | Buffer) => {
@@ -317,6 +377,7 @@ export const ClientServer = () => {
       Logger.info("Client server stopped");
     }
   }
+
   return {
     startClientDiscovery,
     connectToHost,

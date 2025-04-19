@@ -9,6 +9,7 @@ interface StyledTextProps {
   style?: {};
   children?: React.ReactNode;
   fontSize?: number;
+  isEllipsis?: boolean;
 }
 
 const StyledText = ({
@@ -17,11 +18,17 @@ const StyledText = ({
   style,
   children,
   fontSize,
+  isEllipsis,
 }: StyledTextProps) => {
   const { colorScheme } = useTheme();
   const styles = StylesTextStyles(fontWeight, colorScheme, fontSize);
   return (
-    <Text allowFontScaling={false} style={[styles.text, style]}>
+    <Text
+      ellipsizeMode={isEllipsis ? "tail" : "clip"}
+      numberOfLines={isEllipsis ? 1 : undefined}
+      allowFontScaling={false}
+      style={[styles.text, style]}
+    >
       {text || children}
     </Text>
   );

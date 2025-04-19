@@ -1,11 +1,12 @@
 import React, { createContext, useContext, useState, useEffect } from "react";
-import { HostServer, ClientServer } from "../service/Servers";
+import { HostServer, ClientServer } from "./Servers";
 import { Buffer } from "buffer";
 import useUsername from "../hooks/useUsername";
 import { Logger } from "../utils/Logger";
 import TCPSocket from "react-native-tcp-socket";
 import { Vibration } from "react-native";
-import { ClientSharing, HostSharing } from "./Sharing";
+import { ClientSharing } from "./ClientSharing";
+import { HostSharing } from "./HostSharing";
 
 interface NetworkContextType {
   devices: Device[];
@@ -13,7 +14,8 @@ interface NetworkContextType {
   messages: string[];
   receivedFiles: string[];
   sentFiles: { id: number; name: string; size: number }[];
-  isConnected: boolean;
+  isHostConnected: boolean;
+  isClientConnected: boolean;
   isHost: boolean;
   startHosting: () => void;
   startClient: () => void;
@@ -32,20 +34,18 @@ export const NetworkProvider: React.FC<{ children: React.ReactNode }> = ({
   children,
 }) => {
   const [devices, setDevices] = useState<Device[]>([]);
-  const [socket, setSocket] = useState<
-    TCPSocket.Server | TCPSocket.Socket | null
-  >(null);
+  const [socket, setSocket] = useState<TCPSocket.Socket | null>(null);
   const [messages, setMessages] = useState<string[]>([]);
   const [receivedFiles, setReceivedFiles] = useState<string[]>([]);
   const [sentFiles, setSentFiles] = useState<
     { id: number; name: string; size: number }[]
   >([]);
-  const [isConnected, setIsConnected] = useState(false);
+  const [isHostConnected, setIsHostConnected] = useState(false);
+  const [isClientConnected, setIsClientConnected] = useState(false);
   const [isHost, setIsHost] = useState(false);
   const [transferProgress, setTransferProgress] = useState<TransferProgress[]>(
     []
   );
-  const { username } = useUsername();
   const { sendMessageInHost, sendFilesInHost } = HostSharing();
   const { sendFilesInClient, sendMessageInClient } = ClientSharing();
   const { startHostServer, stopHostServer, kickClient } = HostServer();
@@ -56,10 +56,13 @@ export const NetworkProvider: React.FC<{ children: React.ReactNode }> = ({
     disconnectFromHost,
   } = ClientServer();
 
+  const { username } = useUsername();
+
   const startHosting = () => {
     setIsHost(true);
     startHostServer(
       username,
+      setIsHostConnected,
       setDevices,
       setSocket as React.Dispatch<
         React.SetStateAction<TCPSocket.Server | null>
@@ -85,7 +88,7 @@ export const NetworkProvider: React.FC<{ children: React.ReactNode }> = ({
     connectToHost(
       ip,
       username,
-      setIsConnected,
+      setIsClientConnected,
       setSocket as React.Dispatch<
         React.SetStateAction<TCPSocket.Socket | null>
       >,
@@ -104,7 +107,7 @@ export const NetworkProvider: React.FC<{ children: React.ReactNode }> = ({
       return;
     }
     if (isHost) {
-      sendMessageInHost(message, username);
+      sendMessageInHost(socket as TCPSocket.Socket, message, username);
     } else {
       sendMessageInClient(socket as TCPSocket.Socket, message, username);
     }
@@ -123,7 +126,7 @@ export const NetworkProvider: React.FC<{ children: React.ReactNode }> = ({
     }
     if (isHost) {
       await sendFilesInHost(
-        socket as TCPSocket.Server,
+        socket as TCPSocket.Socket,
         files,
         username,
         setTransferProgress
@@ -184,7 +187,7 @@ export const NetworkProvider: React.FC<{ children: React.ReactNode }> = ({
 
   const disconnectFromHostHandler = () => {
     disconnectFromHost(
-      setIsConnected,
+      setIsClientConnected,
       setSocket as React.Dispatch<
         React.SetStateAction<TCPSocket.Socket | null>
       >,
@@ -207,7 +210,8 @@ export const NetworkProvider: React.FC<{ children: React.ReactNode }> = ({
     messages,
     receivedFiles,
     sentFiles,
-    isConnected,
+    isHostConnected,
+    isClientConnected,
     isHost,
     startHosting,
     startClient,

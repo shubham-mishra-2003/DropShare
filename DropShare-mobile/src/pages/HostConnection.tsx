@@ -336,9 +336,8 @@ const HostConnection: FC = () => {
     receivedFiles,
     sentFiles,
     sendMessage,
-    sendFile,
+    sendFiles,
     disconnect,
-    isConnected,
     isHost,
   } = useNetwork();
 

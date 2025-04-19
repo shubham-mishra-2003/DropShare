@@ -7,6 +7,7 @@ import {
   TouchableOpacity,
   ScrollView,
   FlatList,
+  BackHandler,
 } from "react-native";
 import React, { FC, useEffect, useState } from "react";
 import { screenWidth } from "../utils/Constants";
@@ -17,7 +18,7 @@ import Icon from "../components/Icon";
 import BreakerText from "../components/ui/BreakerText";
 import LottieView from "lottie-react-native";
 import QRGenerator from "../components/Sharing/QrGenerator";
-import { goBack, navigate } from "../utils/NavigationUtil";
+import { goBack, navigate, resetAndNavigate } from "../utils/NavigationUtil";
 import { useNetwork } from "../service/NetworkProvider";
 import LinearGradient from "react-native-linear-gradient";
 import StyledText from "../components/ui/StyledText";
@@ -27,16 +28,22 @@ const HostScreen: FC = () => {
   const [isScanner, setIsScanner] = useState(false);
   const { colorScheme } = useTheme();
   const styles = ShareScreenStyles(colorScheme);
-  const { startHosting, devices } = useNetwork();
+  const { startHosting, devices, stopHosting, kickClient } = useNetwork();
+
+  const backAction = () => {
+    stopHosting();
+    resetAndNavigate("home");
+    return true;
+  };
 
   useEffect(() => {
     startHosting();
+    const backHandler = BackHandler.addEventListener(
+      "hardwareBackPress",
+      backAction
+    );
+    return () => backHandler.remove();
   }, []);
-
-  const handleBack = () => {
-    // stopHosting();
-    goBack();
-  };
 
   return (
     <LinearGradient
@@ -46,7 +53,7 @@ const HostScreen: FC = () => {
       style={styles.container}
     >
       <ScrollView style={{ flex: 1, width: "100%" }}>
-        <TouchableOpacity onPress={handleBack} style={styles.backButton}>
+        <TouchableOpacity onPress={backAction} style={styles.backButton}>
           <Icon source={icons.back} height={20} width={20} filter={1} />
         </TouchableOpacity>
         <View style={styles.mainContainer}>
@@ -99,14 +106,14 @@ const HostScreen: FC = () => {
                   <StyledText fontWeight="regular">
                     {device.name} <StyledText text={device.ip} />
                   </StyledText>
-                  {/* <TouchableOpacity onPress={() => removeClient(device.ip)}>
+                  <TouchableOpacity onPress={() => kickClient(device.ip)}>
                     <Icon
                       source={icons.cross}
                       filter={1}
                       height={20}
                       width={20}
                     />
-                  </TouchableOpacity> */}
+                  </TouchableOpacity>
                 </View>
               ))}
             </ScrollView>

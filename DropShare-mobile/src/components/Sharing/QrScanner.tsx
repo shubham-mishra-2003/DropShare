@@ -36,7 +36,8 @@ const QRScanner: React.FC<QRScannerProps> = ({ visible, setVisible }) => {
   const [loading, setLoading] = useState(true);
   const device = useCameraDevice("back");
   const { hasPermission, requestPermission } = useCameraPermission();
-  const { startClient, connectToHostIp, isConnected, stopClient } = useNetwork();
+  const { startClient, connectToHostIp, isConnected, stopClient } =
+    useNetwork();
 
   useEffect(() => {
     const initialize = async () => {
@@ -51,13 +52,14 @@ const QRScanner: React.FC<QRScannerProps> = ({ visible, setVisible }) => {
           return;
         }
       }
-      setLoading(false);
     };
     if (visible) {
       setCodeFound(false);
       setLastScannedData(null);
-      initialize();
-      startClient();
+      initialize().then(() => {
+        setLoading(false);
+        startClient();
+      });
     }
   }, [visible, hasPermission, requestPermission]);
 
@@ -133,11 +135,7 @@ const QRScanner: React.FC<QRScannerProps> = ({ visible, setVisible }) => {
   };
 
   return (
-    <BottomSheet
-      visible={visible}
-      onRequestClose={modalClose}
-      height={600}
-    >
+    <BottomSheet visible={visible} onRequestClose={modalClose} height={600}>
       <View
         style={{
           flex: 1,

@@ -113,6 +113,14 @@ const SettingsPage = () => {
           </TouchableOpacity>
         </View>
       </ScrollView>
+      <View style={{ padding: 15 }}>
+        <StyledText
+          text="Made with ❤️ by Shubham mishra"
+          style={{ textAlign: "center" }}
+          fontWeight="bold"
+          fontSize={17}
+        />
+      </View>
     </LinearGradient>
   );
 };
