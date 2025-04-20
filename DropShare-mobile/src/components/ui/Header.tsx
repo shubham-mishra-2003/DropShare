@@ -42,7 +42,7 @@ const Header: React.FC<HeaderProps> = ({
         <Icon
           source={page === "home" ? icons.menu : icons.back}
           height={20}
-          width={20}
+          width={22}
           filter={1}
         />
       </TouchableOpacity>

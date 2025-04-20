@@ -8,15 +8,27 @@ interface IconProps {
   width: number;
   source: any;
   filter: number;
+  resizeMode?: "cover" | "contain" | "stretch";
 }
 
-const Icon: FC<IconProps> = ({ height, width, source, filter = 1 }) => {
+const Icon: FC<IconProps> = ({
+  height,
+  width,
+  source,
+  filter = 1,
+  resizeMode = "cover",
+}) => {
   const { colorScheme } = useTheme();
 
   const styles = IconsStyles(colorScheme, height, width, filter);
 
   return (
-    <Image source={source} style={styles.icon} height={height} width={width} />
+    <Image
+      source={source}
+      style={[styles.icon, { resizeMode: resizeMode }]}
+      height={height}
+      width={width}
+    />
   );
 };
 

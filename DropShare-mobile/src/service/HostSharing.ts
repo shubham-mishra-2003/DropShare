@@ -13,11 +13,8 @@ import {
   generateRSAKeyPair,
   encryptAESKeyWithRSA,
   decryptAESKeyWithRSA,
-  encryptFileStream,
-  decryptFileStream,
 } from "./Crypto";
 
-// State variables for file transfer
 const fileTransfers = new Map<string, FileTransfer>();
 let buffer = Buffer.alloc(0);
 let receivingFile = false;
@@ -32,9 +29,8 @@ let expectedChunkSize = 0;
 let lastLoggedChunkIndex: number | null = null;
 let aesKeyPair: { [fileId: string]: { key: string; iv: string } } = {};
 let rsaKeyPair: { publicKey: string; privateKey: string } | null = null;
-let senderPublicKey: string | null = null; // Store sender's public key
+let senderPublicKey: string | null = null;
 
-// Interface for file header
 interface FileHeader {
   protocolVersion: string;
   name: string;
@@ -43,7 +39,7 @@ interface FileHeader {
   fileId: string;
   totalChunks: number;
   chunkSize: number;
-  encryptedAESKey?: string; // Base64 encoded encrypted AES key
+  encryptedAESKey?: string;
 }
 
 interface HostReceiveProps {

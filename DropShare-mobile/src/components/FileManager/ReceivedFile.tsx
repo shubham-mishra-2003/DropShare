@@ -181,15 +181,14 @@ const ReceivedFile: React.FC = () => {
                   />
                   <View style={styles.textView}>
                     <StyledText
-                      isEllipsis
-                      fontSize={20}
-                      text={file.name}
                       fontWeight="bold"
+                      isEllipsis
+                      text={file.name}
+                      style={{ width: "65%" }}
                     />
                     <StyledText
-                      fontSize={14}
-                      text={formatFileSize(file.size)}
                       fontWeight="regular"
+                      text={formatFileSize(file.size)}
                     />
                   </View>
                 </TouchableOpacity>

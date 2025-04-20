@@ -172,18 +172,18 @@ import {
   TouchableOpacity,
   View,
   ActivityIndicator,
+  RefreshControl,
 } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
 import RNFS from "react-native-fs";
 import { BackHandler } from "react-native";
-import { useFocusEffect, useRoute } from "@react-navigation/native";
+import { useFocusEffect } from "@react-navigation/native";
 
-import CreateFile from "./CreateFile";
+import CreateFile from "./CreateFolder";
 import { useTheme } from "../../hooks/ThemeProvider";
 import { FilesListStyles } from "../../constants/Styles";
 import { Toast } from "../Toasts";
 import useSelectFile from "../../hooks/useSelectFile";
-import useSettingsButton from "../../hooks/useSettingsButton"; // Import the settings hook
+import useSettingsButton from "../../hooks/useSettingsButton";
 import { goBack, navigate } from "../../utils/NavigationUtil";
 import Header from "../ui/Header";
 import { Colors } from "../../constants/Colors";
@@ -192,6 +192,7 @@ import { icons } from "../../assets";
 import useCurrentPath from "../../hooks/useCurrentPath";
 import LinearGradient from "react-native-linear-gradient";
 import StyledText from "../ui/StyledText";
+import { formatFileSize, getFileType } from "../../utils/FileSystemUtil";
 
 const StorageList = () => {
   const { colorScheme } = useTheme();
@@ -278,10 +279,22 @@ const StorageList = () => {
           style={{ marginTop: 20 }}
         />
       ) : (
-        <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: 5 }}>
+        <ScrollView
+          refreshControl={
+            <RefreshControl
+              refreshing={isLoading}
+              onRefresh={getFiles}
+              progressBackgroundColor={Colors[colorScheme].background}
+              colors={[Colors[colorScheme].tint]}
+            />
+          }
+          style={{ flex: 1 }}
+          contentContainerStyle={{ padding: 5 }}
+        >
           {files.length === 0 && (
             <StyledText
-              fontSize={16}
+              fontSize={20}
+              fontWeight="bold"
               text="No files found"
               style={{ textAlign: "center", marginTop: 20 }}
             />
@@ -294,8 +307,10 @@ const StorageList = () => {
                 backgroundColor: selectedFiles.some((f) => f.path === file.path)
                   ? Colors[colorScheme].tint
                   : Colors[colorScheme].transparent,
-                margin: 5,
-                padding: 10,
+                margin: 3,
+                padding: 5,
+                height: 65,
+                justifyContent: "center",
                 borderRadius: 12,
               }}
               onPress={() => {
@@ -332,37 +347,61 @@ const StorageList = () => {
                 />
               )}
               <View
-                style={{ flexDirection: "row", alignItems: "center", gap: 10 }}
+                style={{
+                  flexDirection: "row",
+                  alignItems: "center",
+                  gap: 10,
+                  height: "100%",
+                }}
               >
-                {file.isDirectory() ? (
-                  <Icon
-                    source={icons.folder}
-                    height={50}
-                    width={50}
-                    filter={1}
-                  />
-                ) : (
+                {getFileType(file) === "photo" ||
+                getFileType(file) === "video" ? (
                   <Image
                     source={{ uri: `file://${file.path}` }}
-                    style={{
-                      width: 50,
-                      height: 50,
-                      borderRadius: 8,
-                      backgroundColor: Colors[colorScheme].background,
-                    }}
-                    onError={() => (
-                      <Icon
-                        source={icons.document}
-                        height={50}
-                        width={50}
-                        filter={1}
-                      />
-                    )}
+                    style={{ width: "18%", height: "100%", borderRadius: 8 }}
+                  />
+                ) : (
+                  <Icon
+                    source={
+                      getFileType(file) == "audio"
+                        ? icons.audio
+                        : getFileType(file) == "apk"
+                        ? icons.app
+                        : getFileType(file) == "archive"
+                        ? icons.zip
+                        : getFileType(file) == "document"
+                        ? icons.document
+                        : icons.folder
+                    }
+                    height={40}
+                    width={60}
+                    filter={1}
+                    resizeMode="contain"
                   />
                 )}
-                <StyledText fontWeight="bold" fontSize={20}>
-                  {file.name}
-                </StyledText>
+                <View
+                  style={{
+                    flex: 1,
+                    flexDirection: "row",
+                    justifyContent: "space-between",
+                    overflow: "hidden",
+                    gap: 10,
+                  }}
+                >
+                  <StyledText
+                    fontWeight="bold"
+                    isEllipsis
+                    text={file.name}
+                    style={{ width: "65%" }}
+                    fontSize={20}
+                  />
+                  {!file.isDirectory() && (
+                    <StyledText
+                      fontWeight="regular"
+                      text={formatFileSize(file.size)}
+                    />
+                  )}
+                </View>
               </View>
             </TouchableOpacity>
           ))}

@@ -34,8 +34,9 @@ const ClientTest: React.FC = () => {
     connectToHostIp,
     sendMessage,
     sendFiles,
-    isConnected,
+    isClientConnected,
     disconnect,
+    
   } = useNetwork();
   const [message, setMessage] = useState("");
   const [pickerVisible, setPickerVisible] = useState(false);
@@ -64,7 +65,7 @@ const ClientTest: React.FC = () => {
     <View style={styles.container}>
       <Text style={styles.title}>Client Dashboard</Text>
       <ScrollView contentContainerStyle={styles.scrollContent}>
-        {isConnected && devices.length > 0 ? (
+        {isClientConnected && devices.length > 0 ? (
           <View style={styles.connectionStatus}>
             <StyledText style={styles.statusText}>
               Connected to "{devices[0]?.name}" ({devices[0]?.ip})
@@ -73,7 +74,7 @@ const ClientTest: React.FC = () => {
         ) : (
           <StyledText style={styles.statusText}>Disconnected</StyledText>
         )}
-        {!isConnected ? (
+        {!isClientConnected ? (
           <>
             <TouchableOpacity style={styles.button} onPress={startClient}>
               <StyledText style={styles.buttonText}>Discover Hosts</StyledText>

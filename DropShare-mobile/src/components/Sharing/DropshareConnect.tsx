@@ -97,7 +97,7 @@ const DropshareConnect = () => {
                   color: "#00aff0",
                   textAlign: "center",
                 }}
-                fontSize={22}
+                fontSize={24}
                 text="Host connection"
               />
             </TouchableOpacity>
@@ -118,7 +118,7 @@ const DropshareConnect = () => {
                 fontWeight="bold"
                 style={{
                   color: Colors[colorScheme].tint,
-                  fontSize: 24,
+                  fontSize: 26,
                   textAlign: "center",
                 }}
                 text="Connect"

@@ -166,7 +166,6 @@ export default function App() {
   return (
     <ThemeProvider>
       <View style={{ flex: 1, width: "100%" }}>
-        {/* Always render RootLayout or permission screen in the background */}
         {permissioned ? (
           <RootLayout />
         ) : (
@@ -213,8 +212,6 @@ export default function App() {
             </TouchableOpacity>
           </View>
         )}
-
-        {/* Show SplashScreen on top until animation completes */}
         {isLoading && (
           <SplashScreen
             contentLoaded={contentLoaded}

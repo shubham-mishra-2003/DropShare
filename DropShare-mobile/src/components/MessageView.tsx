@@ -5,7 +5,7 @@ import {
   TouchableOpacity,
   FlatList,
 } from "react-native";
-import React from "react";
+import React, { useState } from "react";
 import LinearGradient from "react-native-linear-gradient";
 import { Colors } from "../constants/Colors";
 import { useTheme } from "../hooks/ThemeProvider";
@@ -21,11 +21,21 @@ const MessageView = ({
 }) => {
   const { colorScheme } = useTheme();
   const styles = messageScreenStyles(colorScheme);
-  const { disconnect, devices } = useNetwork();
+  const { disconnect, devices, messages, sendMessage } = useNetwork();
+  const [message, setMessage] = useState("");
+
   const handleDisconnect = () => {
     setMessageView(false);
     disconnect();
   };
+
+  const handleSendMessage = () => {
+    if (message.trim()) {
+      sendMessage(message);
+      setMessage("");
+    }
+  };
+
   return (
     <LinearGradient
       start={{ x: 0, y: 0 }}
@@ -40,10 +50,12 @@ const MessageView = ({
         >
           <Icon source={icons.back} filter={1} height={20} width={20} />
         </TouchableOpacity>
-        <View style={{ flexDirection: "row", gap: 5, alignItems: "center" }}>
-          <Icon source={images.logo} height={40} width={40} filter={0} />
-          <StyledText fontSize={20} fontWeight="bold" text="DropShare" />
-        </View>
+        <StyledText
+          fontSize={22}
+          isEllipsis
+          fontWeight="bold"
+          text="Messages"
+        />
         <TouchableOpacity
           style={styles.headerButton}
           onPress={handleDisconnect}
@@ -51,10 +63,15 @@ const MessageView = ({
           <Icon source={icons.disConnect} filter={1} height={20} width={25} />
         </TouchableOpacity>
       </View>
-      <View>
+
+      <View style={styles.messageContainer}>
         <FlatList
-          data={devices}
-          renderItem={({ item }) => <StyledText text={item.name} />}
+          data={messages}
+          renderItem={({ item, index }) => (
+            <View key={index}>
+              <StyledText text={item} />
+            </View>
+          )}
         />
       </View>
     </LinearGradient>
@@ -75,6 +92,11 @@ const messageScreenStyles = (colorScheme: "dark" | "light") =>
       alignItems: "center",
     },
     headerButton: {
+      padding: 10,
+    },
+    messageContainer: {
+      flex: 1,
+      borderRadius: 10,
       padding: 10,
     },
   });

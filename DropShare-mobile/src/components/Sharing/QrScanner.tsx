@@ -36,7 +36,7 @@ const QRScanner: React.FC<QRScannerProps> = ({ visible, setVisible }) => {
   const [loading, setLoading] = useState(true);
   const device = useCameraDevice("back");
   const { hasPermission, requestPermission } = useCameraPermission();
-  const { startClient, connectToHostIp, isConnected, stopClient } =
+  const { startClient, connectToHostIp, isClientConnected, stopClient } =
     useNetwork();
 
   useEffect(() => {
@@ -120,14 +120,16 @@ const QRScanner: React.FC<QRScannerProps> = ({ visible, setVisible }) => {
   );
 
   useEffect(() => {
-    if (isConnected) {
+    if (isClientConnected) {
       setVisible(false);
-      navigate("connection").then(() => Vibration.vibrate(10));
+      navigate("connection").then(() => {
+        Vibration.vibrate(10);
+      });
     }
-  }, [isConnected]);
+  }, [isClientConnected]);
 
   const modalClose = () => {
-    if (!isConnected) {
+    if (!isClientConnected) {
       stopClient();
     }
     setVisible(false);

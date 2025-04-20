@@ -1,4 +1,4 @@
-import { Modal, Text, TextInput, TouchableOpacity, View } from "react-native";
+import { Modal, Text, TextInput, TouchableOpacity, Vibration, View } from "react-native";
 import React, { useState } from "react";
 import RNFS from "react-native-fs";
 
@@ -28,13 +28,15 @@ const CreateFolder = ({
       const newFolder = `${path}/${folderName}`;
       const folderExists = await RNFS.exists(newFolder);
       if (folderName == "") {
-        Toast("Namae the folder first");
+        Toast("Name the folder first");
       } else if (folderExists) {
         Toast(`Folder "${folderName}" already exists.`);
       } else {
         await RNFS.mkdir(newFolder);
         Toast(`Folder "${folderName}" created successfully.`);
         setCreateVisible(false);
+        setFolderName("");
+        Vibration.vibrate(50);
       }
     } catch (error) {
       Toast(`Error creating folder: ${error}`);

@@ -17,6 +17,10 @@ import { useTheme } from "../hooks/ThemeProvider";
 import StyledText from "../components/ui/StyledText";
 import useUsername from "../hooks/useUsername";
 import BreakerText from "../components/ui/BreakerText";
+import Icon from "../components/Icon";
+import { icons } from "../assets";
+import ThemeSwitch from "../components/ThemeSwitch";
+import { Toast } from "../components/Toasts";
 
 const SettingsPage = () => {
   const { toggleSetting, getSetting } = useSettingsButton();
@@ -27,7 +31,7 @@ const SettingsPage = () => {
 
   const handleSubmit = () => {
     if (inputValue.trim()) {
-      saveUsername(inputValue.trim()).then(() => Vibration.vibrate(50));
+      saveUsername(inputValue.trim());
       setInputValue(username);
     }
   };
@@ -60,7 +64,21 @@ const SettingsPage = () => {
       colors={Colors[colorScheme].linearGradientColors}
       style={{ flex: 1 }}
     >
-      <Header page="Settings" onPress={goBack} />
+      <View
+        style={{
+          padding: 15,
+          backgroundColor: Colors[colorScheme].background,
+          flexDirection: "row",
+          justifyContent: "space-between",
+          alignItems: "center",
+        }}
+      >
+        <TouchableOpacity onPress={goBack}>
+          <Icon filter={1} height={20} width={20} source={icons.back} />
+        </TouchableOpacity>
+        <StyledText text="Settings" fontWeight="bold" fontSize={24} />
+        <ThemeSwitch />
+      </View>
       <ScrollView
         scrollEnabled={true}
         style={{ flex: 1 }}
@@ -99,6 +117,10 @@ const SettingsPage = () => {
             ))}
           </View>
           <TouchableOpacity
+            onPress={() => {
+              Toast("Coming Soon");
+              Vibration.vibrate(50);
+            }}
             style={{
               paddingHorizontal: 20,
               paddingVertical: 15,

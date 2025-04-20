@@ -5,42 +5,29 @@ import {
   TouchableOpacity,
   Image,
   ScrollView,
-  Platform,
   Alert,
   RefreshControl,
+  FlatList,
 } from "react-native";
 import RNFS from "react-native-fs";
 import { useTheme } from "../../hooks/ThemeProvider";
 import { FilesStyles } from "../../constants/Styles";
 import useSelectFile from "../../hooks/useSelectFile";
 import { Colors } from "../../constants/Colors";
-import Header from "../ui/Header";
 import { goBack, navigate } from "../../utils/NavigationUtil";
-import { formatFileSize } from "../../utils/FileSystemUtil";
+import {
+  categories,
+  fileOperations,
+  formatFileSize,
+} from "../../utils/FileSystemUtil";
 import { icons } from "../../assets";
 import Icon from "../Icon";
 import LinearGradient from "react-native-linear-gradient";
 import StyledText from "../ui/StyledText";
 import { RouteProp, useRoute } from "@react-navigation/native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-
-const categories = {
-  Photos: [".jpg", ".jpeg", ".png", ".gif", ".bmp"],
-  Videos: [".mp4", ".mkv", ".avi", ".mov", ".wmv"],
-  Audio: [".mp3", ".wav", ".aac", ".flac", ".ogg"],
-  Documents: [
-    ".pdf",
-    ".doc",
-    ".docx",
-    ".xls",
-    ".xlsx",
-    ".ppt",
-    ".pptx",
-    ".txt",
-  ],
-  APKs: [".apk"],
-  Archives: [".zip", ".rar", ".7z", ".tar", ".gz"],
-};
+import { getFileType } from "../../utils/FileSystemUtil";
+import FilesHeader from "./FilesHeader";
 
 type RootStackParamList = {
   filelist: { params: { category: keyof typeof categories } };
@@ -70,8 +57,6 @@ const FilesList: React.FC = () => {
 
         const allFiles: any[] = [];
         const allowedExtensions = categories[category] || [];
-
-        // Process files and directories concurrently
         const promises: Promise<any[]>[] = items.map(async (item) => {
           if (!item || !item.name || item.name.startsWith(".")) return [];
           if (
@@ -155,18 +140,7 @@ const FilesList: React.FC = () => {
     loadFiles();
   }, [loadFiles]);
 
-  const getThumbnail = (file: any) => {
-    const extension = file.name.split(".").pop()?.toLowerCase();
-    if (categories.Photos.includes(`.${extension}`))
-      return { uri: `file://${file.path}` };
-    if (categories.Videos.includes(`.${extension}`))
-      return { uri: `file://${file.path}` };
-    if (categories.Documents.includes(`.${extension}`)) return icons.document;
-    if (categories.Audio.includes(`.${extension}`)) return icons.audio;
-    if (categories.APKs.includes(`.${extension}`)) return icons.app;
-    if (categories.Archives.includes(`.${extension}`)) return icons.archive;
-    return icons.folder; // Fallback icon
-  };
+  const [showOptions, setShowOptions] = useState(false);
 
   return (
     <LinearGradient
@@ -175,10 +149,10 @@ const FilesList: React.FC = () => {
       colors={Colors[colorScheme].linearGradientColors}
       style={styles.container}
     >
-      <Header
-        menu={selectedFiles.length === 0 ? false : true}
-        page={category}
-        onPress={goBack}
+      <FilesHeader
+        heading={category}
+        showOptions={showOptions}
+        setShowOptions={setShowOptions}
       />
       {loading ? (
         <ActivityIndicator size="large" color={Colors[colorScheme].tint} />
@@ -196,7 +170,9 @@ const FilesList: React.FC = () => {
         >
           <View style={styles.filesView}>
             {files.length === 0 ? (
-              <StyledText style={{ color: Colors[colorScheme].text }}>
+              <StyledText
+                style={{ color: Colors[colorScheme].text, textAlign: "center" }}
+              >
                 No files found
               </StyledText>
             ) : (
@@ -227,16 +203,50 @@ const FilesList: React.FC = () => {
                       setSelectedFiles((prev) => [...prev, file]);
                     }
                   }}
-                  style={styles.fileItem}
+                  style={[
+                    styles.fileItem,
+                    {
+                      backgroundColor: selectedFiles.some(
+                        (f) => f.path === file.path
+                      )
+                        ? Colors[colorScheme].tint
+                        : Colors[colorScheme].transparent,
+                    },
+                  ]}
                   key={file.path}
                 >
-                  <Image source={getThumbnail(file)} style={[styles.image]} />
+                  {getFileType(file) === "photo" ||
+                  getFileType(file) === "video" ? (
+                    <Image
+                      source={{ uri: `file://${file.path}` }}
+                      style={{ width: "18%", height: "100%", borderRadius: 8 }}
+                    />
+                  ) : (
+                    <Icon
+                      source={
+                        getFileType(file) == "audio"
+                          ? icons.audio
+                          : getFileType(file) == "apk"
+                          ? icons.app
+                          : getFileType(file) == "archive"
+                          ? icons.zip
+                          : getFileType(file) == "document"
+                          ? icons.document
+                          : icons.folder
+                      }
+                      height={40}
+                      width={60}
+                      filter={1}
+                      resizeMode="contain"
+                    />
+                  )}
                   <View style={styles.textView}>
                     <StyledText
                       fontWeight="bold"
                       isEllipsis
                       text={file.name}
                       style={{ width: "65%" }}
+                      fontSize={18}
                     />
                     <StyledText
                       fontWeight="regular"

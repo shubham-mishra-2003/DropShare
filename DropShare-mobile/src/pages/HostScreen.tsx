@@ -28,7 +28,8 @@ const HostScreen: FC = () => {
   const [isScanner, setIsScanner] = useState(false);
   const { colorScheme } = useTheme();
   const styles = ShareScreenStyles(colorScheme);
-  const { startHosting, devices, stopHosting, kickClient } = useNetwork();
+  const { startHosting, devices, stopHosting, kickClient, isHostConnected } =
+    useNetwork();
 
   const backAction = () => {
     stopHosting();
@@ -78,7 +79,8 @@ const HostScreen: FC = () => {
               text="Ensure the devices are connected to your hotspot network or same wifi"
             />
           </View>
-          {devices.length > 0 ? (
+
+          {isHostConnected && devices.length > 0 ? (
             <ScrollView
               contentContainerStyle={{
                 gap: 10,

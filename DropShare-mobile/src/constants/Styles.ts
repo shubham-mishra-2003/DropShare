@@ -169,10 +169,7 @@ export const ModeSwitchStyles = (colorScheme: "light" | "dark") =>
       justifyContent: "center",
       padding: 4,
       backgroundColor: Colors[colorScheme].background,
-      borderColor: Colors[colorScheme].border,
-      position: "absolute",
-      right: 5,
-      zIndex: 1000,
+      borderColor: Colors[colorScheme].tint,
     },
     image: {
       filter: colorScheme === "dark" ? "invert(1)" : "invert(0)",
@@ -410,9 +407,11 @@ export const FilesStyles = (colorScheme: "light" | "dark") =>
       height: 65,
       borderRadius: 10,
       backgroundColor: Colors[colorScheme].transparent,
-      gap: 8,
+      gap: 10,
       flexDirection: "row",
-      padding: 5,
+      padding: 8,
+      alignItems: "center",
+      justifyContent: "center",
     },
     image: {
       resizeMode: "cover",
@@ -437,13 +436,27 @@ export const FilesStyles = (colorScheme: "light" | "dark") =>
       justifyContent: "flex-end",
       alignItems: "flex-end",
     },
+    optionsContainer: {
+      position: "absolute",
+      top: 20,
+      right: 0,
+      backgroundColor: Colors[colorScheme].itemBackground,
+      borderRadius: 20,
+      elevation: 4,
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.2,
+      shadowRadius: 4,
+      zIndex: 1000,
+      width: 200,
+      padding: 8,
+      borderWidth: 1,
+    },
   });
 
 export const FilesViewerStyles = (colorScheme: "light" | "dark") =>
   StyleSheet.create({
     container: {
       flex: 1,
-      backgroundColor: "#000",
       width: "100%",
     },
     fileName: {

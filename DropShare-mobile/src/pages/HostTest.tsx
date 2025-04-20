@@ -187,7 +187,6 @@ const createStyles = (colorScheme: "light" | "dark") =>
       elevation: 3,
     },
     stopButton: {
-      backgroundColor: "red",
       paddingVertical: 12,
       paddingHorizontal: 20,
       borderRadius: 8,

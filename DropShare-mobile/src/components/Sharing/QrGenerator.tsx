@@ -26,11 +26,11 @@ const QRGenerator: React.FC<QRGeneratorProps> = ({ visible, setVisible }) => {
   const { colorScheme } = useTheme();
   const [loading, setLoading] = useState(true);
   const [qrValue, setQrValue] = useState("");
-  const { startHosting, isConnected, stopHosting } = useNetwork();
+  const { startHosting, isHostConnected, stopHosting } = useNetwork();
   const { username } = useUsername();
 
   const modalClose = () => {
-    if (!isConnected) {
+    if (!isHostConnected) {
       stopHosting();
     }
     setVisible(false);
@@ -66,10 +66,10 @@ const QRGenerator: React.FC<QRGeneratorProps> = ({ visible, setVisible }) => {
   }, [visible]);
 
   useEffect(() => {
-    if (isConnected) {
-      navigate("connection").then(() => Vibration.vibrate(10));
+    if (isHostConnected) {
+      navigate("connection");
     }
-  }, [isConnected]);
+  }, [isHostConnected]);
 
   return (
     <BottomSheet visible={visible} onRequestClose={modalClose} height={500}>

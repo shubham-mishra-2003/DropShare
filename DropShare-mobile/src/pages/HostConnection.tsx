@@ -339,6 +339,8 @@ const HostConnection: FC = () => {
     sendFiles,
     disconnect,
     isHost,
+    isHostConnected,
+    isClientConnected,
   } = useNetwork();
 
   const [fileSelectorOpen, setFileSelectorOpen] = useState(false);
@@ -351,7 +353,7 @@ const HostConnection: FC = () => {
       for (const file of selectToSend) {
         const fileData = await RNFS.readFile(file.path, "base64");
         const buffer = Buffer.from(fileData, "base64");
-        sendFile(file.path, buffer);
+        sendFiles([{ filePath: file.path, fileData: buffer }]);
       }
       setSelectToSend([]);
     } catch (error) {
@@ -365,11 +367,17 @@ const HostConnection: FC = () => {
 
   const [messageView, setMessageView] = useState(false);
 
-  // useEffect(() => {
-  //   if (!isConnected) {
-  //     resetAndNavigate("home");
-  //   }
-  // }, [isConnected]);
+  useEffect(() => {
+    if (isHost) {
+      if (!isHostConnected) {
+        resetAndNavigate("home");
+      }
+    } else {
+      if (!isClientConnected) {
+        resetAndNavigate("home");
+      }
+    }
+  }, [isHostConnected, isClientConnected, isHost]);
 
   return (
     <LinearGradient

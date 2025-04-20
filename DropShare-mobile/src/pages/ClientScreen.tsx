@@ -30,7 +30,7 @@ const ClientScreen: FC = () => {
   const styles = ClientScreenStyles(colorScheme);
   const {
     devices,
-    isConnected,
+    isClientConnected,
     startClient,
     connectToHostIp,
     messages,
@@ -106,10 +106,10 @@ const ClientScreen: FC = () => {
   }, [devices]);
 
   useEffect(() => {
-    if (isConnected) {
+    if (isClientConnected) {
       navigate("clientConnection");
     }
-  }, [isConnected]);
+  }, [isClientConnected]);
 
   return (
     <LinearGradient

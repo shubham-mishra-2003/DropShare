@@ -33,6 +33,7 @@ import disConnectIcon from "./icons/disconnect.png";
 import sentIcon from "./icons/arrow-big-up-dash.png";
 import receivedIcon from "./icons/arrow-big-down-dash.png";
 import messageIcon from "./icons/message-circle.png";
+import zipIcon from "./icons/zip_folder.png";
 
 const icons = {
   sun: sunIcon,
@@ -68,6 +69,7 @@ const icons = {
   sent: sentIcon,
   received: receivedIcon,
   message: messageIcon,
+  zip: zipIcon,
 };
 
 const images = {

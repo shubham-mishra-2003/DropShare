@@ -176,92 +176,161 @@ interface ReadDirItem extends RNFS.ReadDirItem {
 }
 
 export interface ConstantProps {
-  filePath?: string;
   selectedFiles: ReadDirItem[];
+  setSelectedFiles: (selectedFiles: ReadDirItem[]) => void;
 }
 
 export const fileOperations = () => {
-  const handleMove = async ({ filePath, selectedFiles }: ConstantProps) => {
-    if (!filePath) throw new Error("filePath is required for move operation");
-    try {
-      await Promise.all(
-        selectedFiles.map(async (file) => {
-          const destPath = `${filePath}/${file.name}`;
-          await RNFS.moveFile(file.path, destPath);
-          console.log(`File moved to: ${destPath}`);
-        })
-      );
-    } catch (error) {
-      console.error("Error moving files:", error);
-      throw error;
-    }
-  };
+  const handleMove = async ({
+    selectedFiles,
+    setSelectedFiles,
+    destinationPath,
+  }: ConstantProps & { destinationPath: string }) => {
+    const results: { file: string; success: boolean; error?: string }[] = [];
 
-  const handleCopy = async ({ filePath, selectedFiles }: ConstantProps) => {
-    if (!filePath) throw new Error("filePath is required for copy operation");
-    try {
-      await Promise.all(
-        selectedFiles.map(async (file) => {
-          const destPath = `${filePath}/${file.name}`;
-          await RNFS.copyFile(file.path, destPath);
-          console.log(`File copied to: ${destPath}`);
-        })
-      );
-    } catch (error) {
-      console.error("Error copying files:", error);
-      throw error;
-    }
-  };
-
-  const handleMoveToSafe = async ({ selectedFiles }: ConstantProps) => {
-    try {
-      const safePath = `${RNFS.DocumentDirectoryPath}/Safe/`;
-      const safeDirectoryExists = await RNFS.exists(safePath);
-      if (!safeDirectoryExists) {
-        await RNFS.mkdir(safePath);
+    for (const file of selectedFiles) {
+      if (!file.path) {
+        results.push({
+          file: file.name,
+          success: false,
+          error: "filePath is required",
+        });
+        continue;
       }
-
-      await Promise.all(
-        selectedFiles.map(async (file) => {
-          const destPath = `${safePath}${file.name}`;
-          await RNFS.moveFile(file.path, destPath);
-          console.log(`File moved to safe location: ${destPath}`);
-        })
-      );
-    } catch (error) {
-      console.error("Error moving files to safe:", error);
-      throw error;
+      try {
+        let destPath = `${destinationPath}/${file.name}`;
+        if (await RNFS.exists(destPath)) {
+          const timestamp = Date.now();
+          const extension = file.name.split(".").pop();
+          const baseName = file.name.replace(`.${extension}`, "");
+          destPath = `${destinationPath}${baseName}_${timestamp}.${extension}`;
+        }
+        await RNFS.moveFile(file.path, destPath);
+        results.push({ file: file.name, success: true });
+      } catch (error) {
+        results.push({ file: file.name, success: false, error: String(error) });
+      }
     }
+
+    setSelectedFiles([]);
+    return results;
   };
 
-  const handleDelete = async ({ selectedFiles }: ConstantProps) => {
-    try {
-      await Promise.all(
-        selectedFiles.map(async (file) => {
-          await RNFS.unlink(file.path);
-          console.log(`File deleted: ${file.path}`);
-        })
-      );
-    } catch (error) {
-      console.error("Error deleting files:", error);
-      throw error;
+  const handleCopy = async ({
+    selectedFiles,
+    setSelectedFiles,
+    destinationPath,
+  }: ConstantProps & { destinationPath: string }) => {
+    const results: { file: string; success: boolean; error?: string }[] = [];
+
+    for (const file of selectedFiles) {
+      if (!file.path) {
+        results.push({
+          file: file.name,
+          success: false,
+          error: "filePath is required",
+        });
+        continue;
+      }
+      try {
+        let destPath = `${destinationPath}/${file.name}`;
+        if (await RNFS.exists(destPath)) {
+          const timestamp = Date.now();
+          const extension = file.name.split(".").pop();
+          const baseName = file.name.replace(`.${extension}`, "");
+          destPath = `${destinationPath}${baseName}_${timestamp}.${extension}`;
+        }
+        await RNFS.copyFile(file.path, destPath);
+        results.push({ file: file.name, success: true });
+      } catch (error) {
+        results.push({ file: file.name, success: false, error: String(error) });
+      }
     }
+    setSelectedFiles([]);
+    return results;
+  };
+
+  const handleMoveToSafe = async ({
+    selectedFiles,
+    setSelectedFiles,
+    safePath = `${RNFS.DocumentDirectoryPath}/Safe/`,
+  }: ConstantProps & { safePath?: string }) => {
+    const results: { file: string; success: boolean; error?: string }[] = [];
+    if (!(await RNFS.exists(safePath))) {
+      await RNFS.mkdir(safePath);
+    }
+    for (const file of selectedFiles) {
+      if (!file.path) {
+        results.push({
+          file: file.name,
+          success: false,
+          error: "filePath is required",
+        });
+        continue;
+      }
+      try {
+        let destPath = `${safePath}${file.name}`;
+        if (await RNFS.exists(destPath)) {
+          const timestamp = Date.now();
+          const extension = file.name.split(".").pop();
+          const baseName = file.name.replace(`.${extension}`, "");
+          destPath = `${safePath}${baseName}_${timestamp}.${extension}`;
+        }
+        await RNFS.moveFile(file.path, destPath);
+        results.push({ file: file.name, success: true });
+      } catch (error) {
+        results.push({ file: file.name, success: false, error: String(error) });
+      }
+    }
+
+    setSelectedFiles([]);
+    return results;
+  };
+
+  const handleDelete = async ({
+    selectedFiles,
+    setSelectedFiles,
+  }: ConstantProps) => {
+    const results: { file: string; success: boolean; error?: string }[] = [];
+
+    for (const file of selectedFiles) {
+      if (!file.path) {
+        results.push({
+          file: file.name,
+          success: false,
+          error: "filePath is required",
+        });
+        continue;
+      }
+      try {
+        await RNFS.unlink(file.path);
+        results.push({ file: file.name, success: true });
+      } catch (error) {
+        results.push({ file: file.name, success: false, error: String(error) });
+      }
+    }
+
+    setSelectedFiles([]);
+    return results;
   };
 
   const handleInfo = async ({ selectedFiles }: ConstantProps) => {
-    try {
-      const fileInfos = await Promise.all(
-        selectedFiles.map(async (file) => {
-          const stats = await RNFS.stat(file.path);
-          return { name: file.name, stats };
-        })
-      );
-      console.log("File Info:", fileInfos);
-      return fileInfos;
-    } catch (error) {
-      console.error("Error retrieving files info:", error);
-      throw error;
+    const results: { name: string; stats?: any; error?: string }[] = [];
+
+    for (const file of selectedFiles) {
+      if (!file.path) {
+        results.push({ name: file.name, error: "filePath is required" });
+        continue;
+      }
+      try {
+        const stats = await RNFS.stat(file.path);
+        results.push({ name: file.name, stats });
+      } catch (error) {
+        results.push({ name: file.name, error: String(error) });
+      }
     }
+
+    return results;
   };
 
   return {
@@ -287,3 +356,32 @@ export const formatFileSize = (sizeInBytes: number): string => {
 
 export const TEMP_CHUNKS_PATH = `${RNFS.TemporaryDirectoryPath}/DropShare/chunks`;
 export const SAVE_PATH = `${RNFS.ExternalStorageDirectoryPath}/DropShare`;
+
+export const categories = {
+  Photos: [".jpg", ".jpeg", ".png", ".gif", ".bmp"],
+  Videos: [".mp4", ".mkv", ".avi", ".mov", ".wmv"],
+  Audio: [".mp3", ".wav", ".aac", ".flac", ".ogg"],
+  Documents: [
+    ".pdf",
+    ".doc",
+    ".docx",
+    ".xls",
+    ".xlsx",
+    ".ppt",
+    ".pptx",
+    ".txt",
+  ],
+  APKs: [".apk"],
+  Archives: [".zip", ".rar", ".7z", ".tar", ".gz"],
+};
+
+export const getFileType = (file: any) => {
+  const extension = file.name.split(".").pop()?.toLowerCase();
+  if (categories.Photos.includes(`.${extension}`)) return "photo";
+  if (categories.Videos.includes(`.${extension}`)) return "video";
+  if (categories.Documents.includes(`.${extension}`)) return "document";
+  if (categories.Audio.includes(`.${extension}`)) return "audio";
+  if (categories.APKs.includes(`.${extension}`)) return "apk";
+  if (categories.Archives.includes(`.${extension}`)) return "archive";
+  return "folder";
+};

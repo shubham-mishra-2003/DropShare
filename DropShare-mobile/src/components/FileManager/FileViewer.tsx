@@ -21,6 +21,9 @@ import { icons } from "../../assets";
 import useSelectFile from "../../hooks/useSelectFile";
 import Icon from "../Icon";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
+import LinearGradient from "react-native-linear-gradient";
+import { Colors } from "../../constants/Colors";
+import StyledText from "../ui/StyledText";
 
 type RootStackParamList = {
   FileViewer: { files: any[]; currentIndex: number };
@@ -42,6 +45,7 @@ const FileViewer: React.FC = () => {
   const { setSelectedFiles } = useSelectFile();
   const { colorScheme } = useTheme();
   const styles = FilesViewerStyles(colorScheme);
+  const localStyle = localStyles(colorScheme);
   const flatListRef = useRef<FlatList>(null);
   const pdfRef = useRef<Pdf>(null);
   const [currentFileIndex, setCurrentFileIndex] = useState(currentIndex);
@@ -183,28 +187,31 @@ const FileViewer: React.FC = () => {
       const isItemPdf = itemExtension === "pdf";
 
       if (Math.abs(index - currentFileIndex) > 1) {
-        return <View style={localStyles.itemContainer} />;
+        return <View style={localStyle.itemContainer} />;
       }
 
       return (
-        <View style={localStyles.itemContainer}>
+        <LinearGradient
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          colors={Colors[colorScheme].linearGradientColors}
+          style={localStyle.itemContainer}
+        >
           {isLoading && index === currentFileIndex && (
             <ActivityIndicator
               size="large"
-              color="#fff"
-              style={localStyles.loader}
+              color={Colors[colorScheme].tint}
+              style={localStyle.loader}
             />
           )}
           {(isItemImage || isItemVideo || isItemPdf) && (
             <GestureDetector gesture={composedGestures}>
-              <Animated.View
-                style={[localStyles.mediaContainer, animatedStyle]}
-              >
+              <Animated.View style={[localStyle.mediaContainer, animatedStyle]}>
                 {isItemImage && (
                   <Image
                     source={{ uri: itemPath }}
-                    style={localStyles.media}
-                    resizeMode="contain"
+                    style={localStyle.media}
+                    resizeMode="contain" 
                     onError={() => {
                       setIsLoading(false);
                       if (loadingTimeoutRef.current) {
@@ -222,7 +229,7 @@ const FileViewer: React.FC = () => {
                 {isItemVideo && (
                   <Video
                     source={{ uri: itemPath }}
-                    style={localStyles.media}
+                    style={localStyle.media}
                     controls
                     resizeMode="contain"
                     onError={() => {
@@ -253,7 +260,7 @@ const FileViewer: React.FC = () => {
                   <Pdf
                     ref={pdfRef}
                     source={{ uri: itemPath, cache: false }}
-                    style={localStyles.media}
+                    style={localStyle.media}
                     enablePaging
                     onError={() => {
                       setIsLoading(false);
@@ -279,12 +286,12 @@ const FileViewer: React.FC = () => {
             </GestureDetector>
           )}
           {isItemAudio && (
-            <View style={localStyles.audioContainer}>
+            <View style={localStyle.audioContainer}>
               <Icon source={icons.audio} filter={1} height={100} width={100} />
               <Video
                 source={{ uri: itemPath }}
                 controls
-                style={localStyles.audioPlayer}
+                style={localStyle.audioPlayer}
                 onError={() => {
                   setIsLoading(false);
                   if (loadingTimeoutRef.current) {
@@ -308,13 +315,13 @@ const FileViewer: React.FC = () => {
             </View>
           )}
           {!isItemImage && !isItemVideo && !isItemAudio && !isItemPdf && (
-            <View style={localStyles.unsupportedContainer}>
-              <Text style={localStyles.unsupportedText}>
+            <View style={localStyle.unsupportedContainer}>
+              <StyledText style={localStyle.unsupportedText}>
                 Unsupported file type: {item.name}
-              </Text>
+              </StyledText>
             </View>
           )}
-        </View>
+        </LinearGradient>
       );
     },
     [currentFileIndex, isLoading, composedGestures]
@@ -357,18 +364,42 @@ const FileViewer: React.FC = () => {
   }, [currentFileIndex, files]);
 
   return (
-    <View style={styles.container}>
-      <Header
-        onPress={onClose}
-        menu
-        page={currentFile.name}
-        filePath={filePath}
-      />
+    <LinearGradient
+      start={{ x: 0, y: 0 }}
+      end={{ x: 1, y: 1 }}
+      colors={Colors[colorScheme].linearGradientColors}
+      style={styles.container}
+    >
+      <View
+        style={{
+          flexDirection: "row",
+          alignItems: "center",
+          justifyContent: "space-between",
+          padding: 10,
+          backgroundColor: Colors[colorScheme].background,
+        }}
+      >
+        <TouchableOpacity style={{ padding: 10 }}>
+          <Icon source={icons.back} filter={1} height={20} width={20} />
+        </TouchableOpacity>
+        <StyledText
+          isEllipsis
+          text={currentFile.name}
+          fontSize={20}
+          fontWeight="bold"
+          style={{ textAlign: "center", width: "70%" }}
+        />
+        <TouchableOpacity style={{ padding: 10 }}>
+          <Icon source={icons.options} filter={1} height={20} width={20} />
+        </TouchableOpacity>
+      </View>
       <FlatList
         ref={flatListRef}
         data={files}
         renderItem={renderItem}
         horizontal
+        style={{ flex: 1 }}
+        contentContainerStyle={{ height: "100%" }}
         pagingEnabled
         showsHorizontalScrollIndicator={false}
         initialScrollIndex={currentIndex}
@@ -386,104 +417,69 @@ const FileViewer: React.FC = () => {
         maxToRenderPerBatch={3}
         windowSize={3}
       />
-      <View style={localStyles.navigationButtons}>
-        <TouchableOpacity
-          onPress={() => {
-            if (currentFileIndex > 0) {
-              flatListRef.current?.scrollToIndex({
-                index: currentFileIndex - 1,
-                animated: true,
-              });
-            }
-          }}
-          disabled={currentFileIndex === 0}
-          style={[
-            localStyles.navButton,
-            currentFileIndex === 0 && localStyles.disabledButton,
-          ]}
-        >
-          <Text style={localStyles.navButtonText}>Previous</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          onPress={() => {
-            if (currentFileIndex < files.length - 1) {
-              flatListRef.current?.scrollToIndex({
-                index: currentFileIndex + 1,
-                animated: true,
-              });
-            }
-          }}
-          disabled={currentFileIndex === files.length - 1}
-          style={[
-            localStyles.navButton,
-            currentFileIndex === files.length - 1 && localStyles.disabledButton,
-          ]}
-        >
-          <Text style={localStyles.navButtonText}>Next</Text>
-        </TouchableOpacity>
-      </View>
-    </View>
+    </LinearGradient>
   );
 };
 
-const localStyles = StyleSheet.create({
-  itemContainer: {
-    width,
-    height: height - 100,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  mediaContainer: {
-    width: "100%",
-    height: "100%",
-  },
-  media: {
-    width: "100%",
-    height: "100%",
-  },
-  audioContainer: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  audioPlayer: {
-    width: width - 40,
-    height: 60,
-  },
-  unsupportedContainer: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  unsupportedText: {
-    color: "#fff",
-    fontSize: 18,
-    textAlign: "center",
-  },
-  navigationButtons: {
-    position: "absolute",
-    bottom: 20,
-    flexDirection: "row",
-    justifyContent: "space-between",
-    width: "100%",
-    paddingHorizontal: 20,
-  },
-  navButton: {
-    backgroundColor: "rgba(0, 0, 0, 0.5)",
-    padding: 10,
-    borderRadius: 5,
-  },
-  navButtonText: {
-    color: "#fff",
-    fontSize: 16,
-  },
-  disabledButton: {
-    opacity: 0.5,
-  },
-  loader: {
-    position: "absolute",
-    zIndex: 1,
-  },
-});
+const localStyles = (colorScheme: "light" | "dark") =>
+  StyleSheet.create({
+    itemContainer: {
+      width,
+      height: height - 100,
+      justifyContent: "center",
+      alignItems: "center",
+    },
+    mediaContainer: {
+      width: "100%",
+      height: "100%",
+    },
+    media: {
+      width: "100%",
+      height: "100%",
+    },
+    audioContainer: {
+      flex: 1,
+      justifyContent: "center",
+      alignItems: "center",
+    },
+    audioPlayer: {
+      width: width - 40,
+      height: 60,
+    },
+    unsupportedContainer: {
+      flex: 1,
+      justifyContent: "center",
+      alignItems: "center",
+    },
+    unsupportedText: {
+      color: Colors[colorScheme].text,
+      fontSize: 18,
+      textAlign: "center",
+    },
+    navigationButtons: {
+      position: "absolute",
+      bottom: 20,
+      flexDirection: "row",
+      justifyContent: "space-between",
+      width: "100%",
+      paddingHorizontal: 20,
+    },
+    navButton: {
+      backgroundColor: "rgba(0, 0, 0, 0.5)",
+      padding: 10,
+      borderRadius: 5,
+    },
+    navButtonText: {
+      color: "#fff",
+      fontSize: 16,
+    },
+    disabledButton: {
+      opacity: 0.5,
+    },
+    loader: {
+      position: "absolute",
+      zIndex: 1,
+    },
+  });
 
 export default FileViewer;

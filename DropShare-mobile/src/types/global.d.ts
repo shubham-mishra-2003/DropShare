@@ -1,5 +1,7 @@
 import { Permission } from "react-native";
+
 import { Buffer } from "buffer";
+
 declare module "*.png" {
   const value: any;
   export default value;
@@ -28,11 +30,11 @@ declare global {
     totalSize: number;
     chunkHashes: string[];
     status: "Sending" | "Receiving" | "Completed" | "Failed";
-    progress: number; // Percentage (0-100)
-    endTime?: number; // Timestamp when transfer completes or fails
-    error?: string; // Error message if failed
-    aesKey?: string; // AES key for chunk encryption
-    iv?: string; // Initialization vector for chunk encryption
+    progress: number;
+    endTime?: number;
+    error?: string;
+    aesKey?: string;
+    iv?: string;
     lastChunkIndex: number;
   }
   interface UdpSocket {
