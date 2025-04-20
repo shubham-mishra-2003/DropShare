@@ -218,7 +218,7 @@ export const calculateDynamicChunkDivision = (
   fileSize: number
 ): ChunkDivisionResult => {
   const MIN_CHUNK_SIZE = 1024; // 1KB
-  const MAX_CHUNK_SIZE = 64 * 1024; // 64KB
+  const MAX_CHUNK_SIZE = 100 * 1024; // 100KB
 
   let chunkSize: number;
   let numChunks: number;

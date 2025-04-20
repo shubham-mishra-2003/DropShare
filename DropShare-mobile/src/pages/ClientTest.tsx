@@ -54,9 +54,7 @@ const ClientTest: React.FC = () => {
 
   const handleSendFiles = async () => {
     for (const file of selectToSend) {
-      const fileData = await RNFS.readFile(file.path, "base64");
-      const buffer = Buffer.from(fileData, "base64");
-      await sendFiles([{ filePath: file.path, fileData: buffer }]);
+      await sendFiles([{ filePath: file.path }]);
     }
     setSelectToSend([]);
     setPickerVisible(false);
