@@ -1,4 +1,4 @@
-import { StyleSheet, View } from "react-native";
+import { StyleSheet, TouchableWithoutFeedback, View } from "react-native";
 import React from "react";
 import DropShareModal from "./Modal";
 import { useTheme } from "../../hooks/ThemeProvider";

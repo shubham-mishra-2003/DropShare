@@ -18,6 +18,7 @@ import { formatFileSize, SAVE_PATH } from "../../utils/FileSystemUtil";
 import LinearGradient from "react-native-linear-gradient";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import StyledText from "../ui/StyledText";
+import Icon from "../Icon";
 import { icons } from "../../assets";
 
 const ReceivedFile: React.FC = () => {
@@ -112,7 +113,27 @@ const ReceivedFile: React.FC = () => {
         width: "100%",
       }}
     >
-      <Header page="Received" onPress={goBack} />
+      <View
+        style={{
+          flexDirection: "row",
+          alignItems: "center",
+          padding: 14,
+          backgroundColor: Colors[colorScheme].background,
+          justifyContent: "center",
+        }}
+      >
+        <TouchableOpacity
+          onPress={goBack}
+          style={{
+            position: "absolute",
+            left: 10,
+            padding: 10,
+          }}
+        >
+          <Icon source={icons.back} filter={1} height={20} width={20} />
+        </TouchableOpacity>
+        <StyledText text="Received Files" fontSize={24} fontWeight="bold" />
+      </View>
       {loading ? (
         <ActivityIndicator color={Colors[colorScheme].tint} size="large" />
       ) : (
@@ -129,11 +150,10 @@ const ReceivedFile: React.FC = () => {
         >
           {receivedFiles.length === 0 ? (
             <StyledText
+              fontSize={16}
+              fontWeight="bold"
               style={{
-                fontSize: 15,
-                fontWeight: "bold",
                 textAlign: "center",
-                color: "#bbb",
                 marginTop: 20,
               }}
             >

@@ -122,7 +122,7 @@ const QRScanner: React.FC<QRScannerProps> = ({ visible, setVisible }) => {
   useEffect(() => {
     if (isClientConnected) {
       setVisible(false);
-      navigate("connection").then(() => {
+      navigate("connectionscreen").then(() => {
         Vibration.vibrate(10);
       });
     }

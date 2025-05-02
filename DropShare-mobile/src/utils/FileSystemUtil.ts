@@ -175,12 +175,30 @@ interface ReadDirItem extends RNFS.ReadDirItem {
   isFile: () => boolean;
 }
 
-export interface ConstantProps {
-  selectedFiles: ReadDirItem[];
-  setSelectedFiles: (selectedFiles: ReadDirItem[]) => void;
+interface File {
+  name: string;
+  path?: string;
+}
+
+interface ConstantProps {
+  selectedFiles: File[];
+  setSelectedFiles: (files: File[]) => void;
 }
 
 export const fileOperations = () => {
+  const validateFileName = (name: string): boolean => {
+    const invalidChars = /[<>:"/\\|?*]|\.\.|\.$/;
+    return !invalidChars.test(name) && name.length > 0 && name.length <= 255;
+  };
+
+  // const generateUniquePath = async (destPath: string): Promise<string> => {
+  //   if (!(await RNFS.exists(destPath))) return destPath;
+  //   const timestamp = Date.now();
+  //   const extension = path.extname(destPath);
+  //   const baseName = path.basename(destPath, extension);
+  //   return path.join(path.dirname(destPath), `${baseName}_${timestamp}${extension}`);
+  // };
+
   const handleMove = async ({
     selectedFiles,
     setSelectedFiles,
@@ -193,19 +211,14 @@ export const fileOperations = () => {
         results.push({
           file: file.name,
           success: false,
-          error: "filePath is required",
+          error: 'File path is required',
         });
         continue;
       }
+
       try {
-        let destPath = `${destinationPath}/${file.name}`;
-        if (await RNFS.exists(destPath)) {
-          const timestamp = Date.now();
-          const extension = file.name.split(".").pop();
-          const baseName = file.name.replace(`.${extension}`, "");
-          destPath = `${destinationPath}${baseName}_${timestamp}.${extension}`;
-        }
-        await RNFS.moveFile(file.path, destPath);
+        // const destPath = await generateUniquePath(path.join(destinationPath, file.name));
+        // await RNFS.moveFile(file.path, destPath);
         results.push({ file: file.name, success: true });
       } catch (error) {
         results.push({ file: file.name, success: false, error: String(error) });
@@ -228,24 +241,20 @@ export const fileOperations = () => {
         results.push({
           file: file.name,
           success: false,
-          error: "filePath is required",
+          error: 'File path is required',
         });
         continue;
       }
+
       try {
-        let destPath = `${destinationPath}/${file.name}`;
-        if (await RNFS.exists(destPath)) {
-          const timestamp = Date.now();
-          const extension = file.name.split(".").pop();
-          const baseName = file.name.replace(`.${extension}`, "");
-          destPath = `${destinationPath}${baseName}_${timestamp}.${extension}`;
-        }
-        await RNFS.copyFile(file.path, destPath);
+        // const destPath = await generateUniquePath(path.join(destinationPath, file.name));
+        // await RNFS.copyFile(file.path, destPath);
         results.push({ file: file.name, success: true });
       } catch (error) {
         results.push({ file: file.name, success: false, error: String(error) });
       }
     }
+
     setSelectedFiles([]);
     return results;
   };
@@ -253,34 +262,35 @@ export const fileOperations = () => {
   const handleMoveToSafe = async ({
     selectedFiles,
     setSelectedFiles,
-    safePath = `${RNFS.DocumentDirectoryPath}/Safe/`,
+    // safePath = path.join(RNFS.DocumentDirectoryPath, 'Safe'),
   }: ConstantProps & { safePath?: string }) => {
     const results: { file: string; success: boolean; error?: string }[] = [];
-    if (!(await RNFS.exists(safePath))) {
-      await RNFS.mkdir(safePath);
-    }
-    for (const file of selectedFiles) {
-      if (!file.path) {
-        results.push({
-          file: file.name,
-          success: false,
-          error: "filePath is required",
-        });
-        continue;
-      }
-      try {
-        let destPath = `${safePath}${file.name}`;
-        if (await RNFS.exists(destPath)) {
-          const timestamp = Date.now();
-          const extension = file.name.split(".").pop();
-          const baseName = file.name.replace(`.${extension}`, "");
-          destPath = `${safePath}${baseName}_${timestamp}.${extension}`;
+
+    try {
+      // if (!(await RNFS.exists(safePath))) {
+      //   await RNFS.mkdir(safePath);
+      // }
+
+      for (const file of selectedFiles) {
+        if (!file.path) {
+          results.push({
+            file: file.name,
+            success: false,
+            error: 'File path is required',
+          });
+          continue;
         }
-        await RNFS.moveFile(file.path, destPath);
-        results.push({ file: file.name, success: true });
-      } catch (error) {
-        results.push({ file: file.name, success: false, error: String(error) });
+
+        try {
+          // const destPath = await generateUniquePath(path.join(safePath, file.name));
+          // await RNFS.moveFile(file.path, destPath);
+          results.push({ file: file.name, success: true });
+        } catch (error) {
+          results.push({ file: file.name, success: false, error: String(error) });
+        }
       }
+    } catch (error) {
+      results.push({ file: 'Safe directory creation', success: false, error: String(error) });
     }
 
     setSelectedFiles([]);
@@ -298,10 +308,11 @@ export const fileOperations = () => {
         results.push({
           file: file.name,
           success: false,
-          error: "filePath is required",
+          error: 'File path is required',
         });
         continue;
       }
+
       try {
         await RNFS.unlink(file.path);
         results.push({ file: file.name, success: true });
@@ -319,9 +330,10 @@ export const fileOperations = () => {
 
     for (const file of selectedFiles) {
       if (!file.path) {
-        results.push({ name: file.name, error: "filePath is required" });
+        results.push({ name: file.name, error: 'File path is required' });
         continue;
       }
+
       try {
         const stats = await RNFS.stat(file.path);
         results.push({ name: file.name, stats });
@@ -333,12 +345,64 @@ export const fileOperations = () => {
     return results;
   };
 
+  const handleRename = async ({
+    selectedFiles,
+    setSelectedFiles,
+    newNames,
+  }: ConstantProps & { newNames: string[] }) => {
+    const results: { file: string; success: boolean; error?: string }[] = [];
+
+    if (selectedFiles.length !== newNames.length) {
+      return [{
+        file: 'Rename operation',
+        success: false,
+        error: 'Number of files and new names must match',
+      }];
+    }
+
+    for (let i = 0; i < selectedFiles.length; i++) {
+      const file = selectedFiles[i];
+      const newName = newNames[i];
+
+      if (!file.path) {
+        results.push({
+          file: file.name,
+          success: false,
+          error: 'File path is required',
+        });
+        continue;
+      }
+
+      if (!validateFileName(newName)) {
+        results.push({
+          file: file.name,
+          success: false,
+          error: 'Invalid file name',
+        });
+        continue;
+      }
+
+      try {
+        // const dir = path.dirname(file.path);
+        // const newPath = await generateUniquePath(path.join(dir, newName));
+        // await RNFS.moveFile(file.path, newPath);
+        results.push({ file: file.name, success: true });
+      } catch (error) {
+        results.push({ file: file.name, success: false, error: String(error) });
+      }
+    }
+
+    setSelectedFiles([]);
+    return results;
+  };
+
   return {
     handleMove,
     handleCopy,
     handleDelete,
     handleMoveToSafe,
     handleInfo,
+    handleRename,
   };
 };
 

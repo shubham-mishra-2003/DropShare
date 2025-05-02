@@ -1,87 +1,176 @@
-// ConnectionScreen.tsx
-import React, { FC, useState } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
   View,
-  TouchableOpacity,
   FlatList,
-  Image,
-  ProgressBarAndroid,
-  Platform,
+  TouchableOpacity,
+  StyleSheet,
+  BackHandler,
 } from "react-native";
-import { useTheme } from "../hooks/ThemeProvider";
-import { Colors } from "../constants/Colors";
-import Icon from "../components/Icon";
-import { icons, images } from "../assets";
-import MediaPicker from "../components/MediaPicker";
-import { formatFileSize } from "../utils/FileSystemUtil";
-import BreakerText from "../components/ui/BreakerText";
-import RNFS from "react-native-fs";
-import { Buffer } from "buffer";
-import { resetAndNavigate } from "../utils/NavigationUtil";
+import { ProgressBar } from "@react-native-community/progress-bar-android";
 import { useNetwork } from "../service/NetworkProvider";
-import { connectionStyles } from "../constants/Styles";
+import RNFS from "react-native-fs";
+import { Colors } from "../constants/Colors";
+import { useTheme } from "../hooks/ThemeProvider";
+import MediaPicker from "../components/MediaPicker";
 import StyledText from "../components/ui/StyledText";
 import LinearGradient from "react-native-linear-gradient";
+import { navigate, resetAndNavigate } from "../utils/NavigationUtil";
 import DropShareModal from "../components/ui/Modal";
 import MessageView from "../components/MessageView";
+import Icon from "../components/Icon";
+import { icons } from "../assets";
+import { Toast } from "../components/Toasts";
+import { formatFileSize } from "../utils/FileSystemUtil";
+import BreakerText from "../components/ui/BreakerText";
 
-const ConnectionScreen: FC = () => {
+const ConnectionScreen: React.FC = () => {
   const { colorScheme } = useTheme();
-  const styles = connectionStyles(colorScheme);
   const {
     devices,
-    messages,
-    receivedFiles,
-    sentFiles,
-    sendMessage,
     sendFiles,
     disconnect,
+    stopClient,
     isHost,
+    kickClient,
+    transferProgress,
     isHostConnected,
     isClientConnected,
-    kickClient,
+    stopHosting,
   } = useNetwork();
-
-  const [fileSelectorOpen, setFileSelectorOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState<"Sent" | "Received">("Sent");
   const [selectToSend, setSelectToSend] = useState<RNFS.ReadDirItem[]>([]);
   const [messageView, setMessageView] = useState(false);
-  const [transferProgress, setTransferProgress] = useState<{
-    progress: string;
-    speed: string;
-    percentage: number;
-  }>({ progress: "0/0 bytes", speed: "0 KB/s", percentage: 0 });
 
-  // const handleSendFile = async () => {
-  //   if (!selectToSend.length) return;
-  //   try {
-  //     for (const file of selectToSend) {
-  //       const fileData = await RNFS.readFile(file.path, "base64");
-  //       const buffer = Buffer.from(fileData, "base64");
-  //       await sendFile(file.path, buffer, setTransferProgress);
-  //     }
-  //     setSelectToSend([]);
-  //     setTransferProgress({
-  //       progress: "0/0 bytes",
-  //       speed: "0 KB/s",
-  //       percentage: 0,
-  //     });
-  //   } catch (error) {
-  //     console.error("Error sending files:", error);
-  //   }
-  // };
+  const styles = createStyles(colorScheme);
 
-  const handleSendMessage = () => {
-    sendMessage(`Hello from ${isHost ? "Host" : "Client"}`);
+  const handleSendFiles = async () => {
+    for (const file of selectToSend) {
+      await sendFiles([{ filePath: file.path }]);
+    }
+    setSelectToSend([]);
   };
 
-  const handleDisconnect = () => {
-    disconnect();
+  const BackClick = () => {
+    stopClient();
     resetAndNavigate("home");
+    return true;
   };
 
-  const handleKickClient = () => {
-    kickClient(devices[devices.length - 1].ip);
+  const backPressCount = useRef(0);
+  useEffect(() => {
+    const backAction = () => {
+      if (backPressCount.current === 0) {
+        backPressCount.current += 1;
+        Toast("You will be disconnected and may effect transfer");
+        setTimeout(() => {
+          backPressCount.current = 0;
+        }, 2000);
+        return true;
+      }
+      if (backPressCount.current === 1) {
+        BackHandler.addEventListener("hardwareBackPress", BackClick);
+      }
+      return true;
+    };
+    const backHandler = BackHandler.addEventListener(
+      "hardwareBackPress",
+      backAction
+    );
+    return () => backHandler.remove();
+  }, []);
+
+  // const [transfers, setTransfers] = useState<TransferProgress[]>([
+  //   {
+  //     fileId: "1",
+  //     fileName: "document.pdf",
+  //     transferredBytes: 5 * 1024,
+  //     fileSize: 10 * 1024,
+  //     speed: formatFileSize(1024),
+  //     status: "Sending",
+  //   },
+  //   {
+  //     fileId: "2",
+  //     fileName: "photo.jpg",
+  //     transferredBytes: 5 * 1024,
+  //     fileSize: 12.5 * 1024,
+  //     speed: formatFileSize(512),
+  //     status: "Receiving",
+  //   },
+  //   {
+  //     fileId: "3",
+  //     fileName: "video.mp4",
+  //     transferredBytes: 5 * 1024,
+  //     fileSize: 10 * 1024,
+  //     speed: formatFileSize(2048),
+  //     status: "Sending",
+  //   },
+  //   {
+  //     fileId: "4",
+  //     fileName: "video.mp4",
+  //     transferredBytes: 5 * 1024,
+  //     fileSize: 10 * 1024,
+  //     speed: formatFileSize(2048),
+  //     status: "Sending",
+  //   },
+  //   {
+  //     fileId: "5",
+  //     fileName: "video.mp4",
+  //     transferredBytes: 5 * 1024,
+  //     fileSize: 10 * 1024,
+  //     speed: formatFileSize(2048),
+  //     status: "Completed",
+  //   },
+  // ]);
+
+  useEffect(() => {
+    if (isHost) {
+      if (!isHostConnected) {
+        resetAndNavigate("home").then(() => {
+          stopHosting();
+        });
+      }
+    } else {
+      if (!isClientConnected) {
+        resetAndNavigate("home").then(() => {
+          stopClient();
+        });
+      }
+    }
+  });
+
+  const renderTransferItem = ({ item }: { item: TransferProgress }) => {
+    const percentage =
+      item.fileSize > 0 ? (item.transferredBytes / item.fileSize) * 100 : 0;
+
+    return (
+      <View style={styles.transferInfo}>
+        <StyledText
+          fontSize={18}
+          fontWeight="bold"
+          isEllipsis
+          style={{ width: "90%" }}
+        >
+          {item.fileName}
+        </StyledText>
+        <View style={styles.transferDetails}>
+          <StyledText fontSize={16} fontWeight="bold" isEllipsis>
+            {item.status} • {formatFileSize(item.transferredBytes)}
+          </StyledText>
+          <StyledText fontSize={14} fontWeight="bold">
+            Speed: {item.speed}
+          </StyledText>
+        </View>
+        {item.status != "Completed" && (
+          <ProgressBar
+            styleAttr="Horizontal"
+            animating={true}
+            indeterminate={false}
+            progress={percentage / 100}
+            color={Colors[colorScheme].tint}
+            style={styles.progressBar}
+          />
+        )}
+      </View>
+    );
   };
 
   return (
@@ -89,180 +178,117 @@ const ConnectionScreen: FC = () => {
       start={{ x: 0, y: 0 }}
       end={{ x: 1, y: 1 }}
       colors={Colors[colorScheme].linearGradientColors}
-      style={styles.main}
+      style={styles.container}
     >
-      <View style={styles.header}>
-        <TouchableOpacity
-          style={styles.headerButton}
-          onPress={handleDisconnect}
-        >
-          <Icon source={icons.back} filter={1} height={20} width={20} />
-        </TouchableOpacity>
-        <View style={{ flexDirection: "row", gap: 5, alignItems: "center" }}>
-          <Icon source={images.logo} height={40} width={40} filter={0} />
-          <StyledText fontSize={24} fontWeight="bold" text="DropShare" />
-        </View>
-        <TouchableOpacity
-          style={styles.headerButton}
-          onPress={handleDisconnect}
-        >
-          <Icon source={icons.disConnect} filter={1} height={20} width={25} />
-        </TouchableOpacity>
-      </View>
-
-      <View style={{ padding: 15, gap: 10 }}>
-        <StyledText
-          fontSize={22}
-          fontWeight="bold"
-          text={isHost ? "Connected Clients" : "Connected Host"}
+      <StyledText
+        fontSize={30}
+        fontWeight="bold"
+        style={{ textAlign: "center" }}
+        text={isHost ? "Host DashBoard" : "Client Dashboard"}
+      />
+      <View style={styles.mainContent}>
+        <BreakerText
+          fontSize={24}
+          text={isHost ? "Connected Clients :" : "Connected to :"}
         />
-        <FlatList
-          data={devices}
-          keyExtractor={(item) => item.ip}
-          renderItem={({ item }) => (
-            <View
-              style={{
-                flexDirection: "row",
-                justifyContent: "space-between",
-                alignItems: "center",
-                padding: 10,
-                backgroundColor: Colors[colorScheme].itemBackground,
-                borderRadius: 10,
-              }}
-            >
-              <StyledText fontSize={18}>
-                {item.name} ({item.ip})
-              </StyledText>
-              {isHost && (
-                <TouchableOpacity onPress={() => kickClient(item.ip)}>
-                  <Icon
-                    source={icons.cross}
-                    filter={1}
-                    height={20}
-                    width={20}
-                  />
-                </TouchableOpacity>
-              )}
-            </View>
-          )}
-        />
-      </View>
-
-      {/* Files Section */}
-      <FlatList
-        data={[
-          { key: "tabs" },
-          {
-            key: "files",
-            data: activeTab === "Sent" ? sentFiles : receivedFiles,
-          },
-        ]}
-        renderItem={({ item }) => {
-          if (item.key === "tabs") {
-            return (
-              <View style={styles.sendReceiveContainer}>
+        <View>
+          <FlatList
+            keyExtractor={(item) => item.ip}
+            data={devices}
+            scrollEnabled={true}
+            style={{
+              backgroundColor: Colors[colorScheme].transparent,
+              borderRadius: 20,
+              maxHeight: 130,
+            }}
+            contentContainerStyle={{ gap: 5, padding: 10 }}
+            renderItem={(device) => (
+              <View
+                style={{
+                  flexDirection: "row",
+                  justifyContent: "space-between",
+                  gap: 10,
+                  paddingVertical: 15,
+                  paddingHorizontal: 15,
+                  backgroundColor: Colors[colorScheme].transparent,
+                  borderRadius: 20,
+                  borderWidth: 2,
+                  borderColor: Colors[colorScheme].itemBackground,
+                }}
+              >
+                <StyledText
+                  fontSize={18}
+                  fontWeight="bold"
+                  isEllipsis
+                  text={device.item.name}
+                  style={{ width: "65%" }}
+                />
                 <TouchableOpacity
-                  onPress={() => setActiveTab("Sent")}
-                  style={[
-                    styles.sendReceiveButton,
-                    {
-                      backgroundColor:
-                        activeTab === "Sent"
-                          ? Colors[colorScheme].tint
-                          : Colors[colorScheme].background,
-                    },
-                  ]}
+                  onPress={() => {
+                    isHost ? kickClient(device.item.ip) : disconnect();
+                  }}
+                  style={{
+                    padding: 10,
+                    backgroundColor: "red",
+                    borderRadius: 20,
+                  }}
                 >
-                  <Icon source={icons.sent} height={25} width={25} filter={1} />
-                  <StyledText text="Sent" fontSize={18} fontWeight="bold" />
-                </TouchableOpacity>
-                <TouchableOpacity
-                  onPress={() => setActiveTab("Received")}
-                  style={[
-                    styles.sendReceiveButton,
-                    {
-                      backgroundColor:
-                        activeTab === "Received"
-                          ? Colors[colorScheme].tint
-                          : Colors[colorScheme].background,
-                    },
-                  ]}
-                >
-                  <Icon
-                    source={icons.received}
-                    height={25}
-                    width={25}
-                    filter={1}
-                  />
-                  <StyledText text="Received" fontSize={18} fontWeight="bold" />
+                  <StyledText text="Disconnect" />
                 </TouchableOpacity>
               </View>
-            );
+            )}
+          />
+        </View>
+        <BreakerText text="Files Transfer List" fontSize={20} />
+        <FlatList
+          data={transferProgress}
+          style={{
+            flex: 1,
+            backgroundColor: Colors[colorScheme].transparent,
+            borderRadius: 20,
+            marginVertical: 5,
+          }}
+          keyExtractor={(item) => item.fileId}
+          renderItem={renderTransferItem}
+          ListEmptyComponent={
+            <StyledText style={styles.noData}>
+              No files Transfered yet
+            </StyledText>
           }
-          return (
-            <View style={styles.fileContainer}>
-              <BreakerText text={`${activeTab} Files`} />
-              {/* {item.data.length > 0 ? (
-                <FlatList
-                  data={item.data}
-                  keyExtractor={(file) => file.id || file}
-                  renderItem={({ item: file }) => (
-                    <View style={styles.fileItem}>
-                      <StyledText
-                        text={file.name || file.split("/").pop()}
-                        fontSize={16}
-                      />
-                      <StyledText
-                        text={formatFileSize(file.size || RNFS.stat(file).size)}
-                        fontSize={16}
-                      />
-                    </View>
-                  )}
-                />
-              ) : (
-                <StyledText
-                  text={`No files ${activeTab.toLowerCase()} yet`}
-                  fontSize={18}
-                  style={{ textAlign: "center" }}
-                />
-              )} */}
-            </View>
-          );
-        }}
-      />
-
-      {/* Action Buttons */}
+          scrollEnabled={true}
+          contentContainerStyle={{
+            gap: 5,
+            padding: 10,
+          }}
+        />
+      </View>
       <View
         style={{
+          paddingHorizontal: 20,
+          gap: 10,
           flexDirection: "row",
+          marginTop: 10,
           justifyContent: "space-around",
-          padding: 15,
+          alignItems: "center",
         }}
       >
         {selectToSend.length > 0 && (
-          <TouchableOpacity>
+          <TouchableOpacity style={styles.sendButton} onPress={handleSendFiles}>
             <StyledText text="Send" fontSize={20} fontWeight="bold" />
           </TouchableOpacity>
         )}
-        <TouchableOpacity onPress={() => setFileSelectorOpen(true)}>
-          <StyledText text="Select Files" fontSize={20} fontWeight="bold" />
-        </TouchableOpacity>
+        <MediaPicker
+          selectToSend={selectToSend}
+          setSelectToSend={setSelectToSend}
+        />
       </View>
-
-      {/* Message Button */}
       <TouchableOpacity
         style={styles.messageButton}
         onPress={() => setMessageView(true)}
+        accessibilityLabel="Open messages"
       >
         <Icon source={icons.message} filter={1} height={30} width={30} />
       </TouchableOpacity>
-
-      <MediaPicker
-        selectToSend={selectToSend}
-        setSelectToSend={setSelectToSend}
-        visible={fileSelectorOpen}
-        setVisible={() => setFileSelectorOpen(false)}
-      />
       <DropShareModal
         visible={messageView}
         onRequestClose={() => setMessageView(false)}
@@ -272,5 +298,92 @@ const ConnectionScreen: FC = () => {
     </LinearGradient>
   );
 };
+
+const createStyles = (colorScheme: "light" | "dark") =>
+  StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: Colors[colorScheme].background,
+      paddingTop: 50,
+      paddingBottom: 30,
+    },
+    mainContent: {
+      paddingHorizontal: 20,
+      justifyContent: "space-between",
+      flex: 1,
+    },
+    subtitle: {
+      marginTop: 20,
+      marginBottom: 10,
+      textAlign: "center",
+    },
+    connectionStatus: {
+      backgroundColor: Colors[colorScheme].itemBackground,
+      padding: 10,
+      borderRadius: 8,
+      marginBottom: 10,
+      alignItems: "center",
+    },
+    transferCard: {
+      backgroundColor: Colors[colorScheme].itemBackground,
+      padding: 10,
+      borderRadius: 8,
+      marginVertical: 5,
+      flexDirection: "row",
+      alignItems: "center",
+      shadowColor: "#000",
+      shadowOffset: { width: 0, height: 1 },
+      shadowOpacity: 0.1,
+      shadowRadius: 2,
+      elevation: 1,
+    },
+    transferInfo: {
+      flex: 1,
+      backgroundColor: Colors[colorScheme].transparent,
+      borderRadius: 20,
+      borderWidth: 2,
+      borderColor: Colors[colorScheme].itemBackground,
+      padding: 10,
+      gap: 10,
+    },
+    transferDetails: {
+      flexDirection: "row",
+      justifyContent: "space-between",
+      marginTop: 5,
+      width: "100%",
+    },
+    progressBar: {
+      marginTop: 10,
+      height: 10,
+      borderRadius: 10,
+    },
+    noData: {
+      color: Colors[colorScheme].text + "80",
+      fontSize: 14,
+      textAlign: "center",
+      marginVertical: 10,
+    },
+    messageButton: {
+      position: "absolute",
+      bottom: 75,
+      right: 20,
+      backgroundColor: Colors[colorScheme].tint,
+      borderRadius: 30,
+      padding: 12,
+      elevation: 5,
+      shadowColor: "#000",
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.3,
+      shadowRadius: 4,
+    },
+    sendButton: {
+      padding: 15,
+      backgroundColor: Colors[colorScheme].tint,
+      borderRadius: 20,
+      alignItems: "center",
+      justifyContent: "center",
+      width: "45%",
+    },
+  });
 
 export default ConnectionScreen;

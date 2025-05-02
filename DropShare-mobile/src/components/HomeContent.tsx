@@ -1,7 +1,13 @@
 import React, { useState, useCallback, useEffect, useRef } from "react";
-import { View, Text, TouchableOpacity, ScrollView } from "react-native";
+import {
+  View,
+  Text,
+  TouchableOpacity,
+  ScrollView,
+  RefreshControl,
+} from "react-native";
 import { useFocusEffect } from "@react-navigation/native";
-import { navigate } from "../utils/NavigationUtil";
+import { navigate, resetAndNavigate } from "../utils/NavigationUtil";
 import { filesStyle } from "../constants/Styles";
 import { useTheme } from "../hooks/ThemeProvider";
 import { Colors } from "../constants/Colors";
@@ -13,6 +19,7 @@ import DropShareModal from "./ui/Modal";
 import DropshareConnect from "./Sharing/DropshareConnect";
 import LinearGradient from "react-native-linear-gradient";
 import StyledText from "./ui/StyledText";
+import { useNetwork } from "../service/NetworkProvider";
 
 interface FileCounts {
   [key: string]: number;
@@ -27,7 +34,6 @@ interface Category {
 const HomeContent: React.FC = () => {
   const { colorScheme } = useTheme();
   const styles = filesStyle(colorScheme);
-  const [refresh, setRefresh] = useState(false);
   const [fileCounts, setFileCounts] = useState<FileCounts>({});
   const [storage, setStorage] = useState({
     used: 0,
@@ -43,7 +49,7 @@ const HomeContent: React.FC = () => {
   }>({});
   const isFetchingRef = useRef(false);
 
-  const fetchData = useCallback(async (forceRefresh = false) => {
+  const fetchData = useCallback(async (forceRefresh = true) => {
     if (isFetchingRef.current) return;
     const now = Date.now();
     if (
@@ -79,7 +85,6 @@ const HomeContent: React.FC = () => {
 
       setStorage(newStorage);
       setFileCounts(fileCounts);
-      setRefresh((prev) => !prev);
 
       cacheRef.current = {
         storage: newStorage,
@@ -112,6 +117,20 @@ const HomeContent: React.FC = () => {
     { name: "Archives", icon: icons.archive, color: "#8D6E63" },
   ];
 
+  const { isHost, isHostConnected, isClientConnected } = useNetwork();
+
+  useEffect(() => {
+    if (isHost) {
+      if (isHostConnected) {
+        navigate("connectionscreen");
+      }
+    } else {
+      if (isClientConnected) {
+        navigate("connectionscreen");
+      }
+    }
+  }, [isHostConnected, isClientConnected]);
+
   return (
     <LinearGradient
       start={{ x: 0, y: 0 }}
@@ -119,26 +138,13 @@ const HomeContent: React.FC = () => {
       colors={Colors[colorScheme].linearGradientColors}
       style={styles.mainView}
     >
-      <TouchableOpacity onPress={() => navigate("testhost")}>
-        <StyledText fontSize={20} fontWeight="bold">
-          Test Host
-        </StyledText>
-      </TouchableOpacity>
-      <TouchableOpacity onPress={() => navigate("testclient")}>
-        <StyledText fontSize={20} fontWeight="bold">
-          Test Client
-        </StyledText>
-      </TouchableOpacity>
-      <TouchableOpacity onPress={() => navigate("hostConnection")}>
-        <StyledText fontSize={25}>Host Connection</StyledText>
-      </TouchableOpacity>
-      <TouchableOpacity onPress={() => navigate("clientConnection")}>
-        <StyledText fontSize={25}>Client Connection</StyledText>
-      </TouchableOpacity>
       <View style={{ paddingHorizontal: 10 }}>
         <StyledText text="Files" fontWeight="bold" fontSize={55} />
       </View>
       <ScrollView
+        refreshControl={
+          <RefreshControl onRefresh={fetchData} refreshing={false} />
+        }
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingHorizontal: 12, gap: 10 }}
       >

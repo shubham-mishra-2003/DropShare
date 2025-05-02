@@ -1,5 +1,6 @@
 import {
   ActivityIndicator,
+  FlatList,
   Image,
   ScrollView,
   StyleSheet,
@@ -13,9 +14,9 @@ import { icons } from "../assets";
 import BottomSheet from "./ui/BottomSheet";
 import { Colors } from "../constants/Colors";
 import { useTheme } from "../hooks/ThemeProvider";
-import { screenWidth } from "../utils/Constants";
 import StyledText from "./ui/StyledText";
-import { formatFileSize } from "../utils/FileSystemUtil";
+import { formatFileSize, getFileType } from "../utils/FileSystemUtil";
+import Icon from "./Icon";
 
 interface Category {
   name: string;
@@ -25,8 +26,6 @@ interface Category {
 }
 
 interface MediaPickerProps {
-  visible: boolean;
-  setVisible: (visible: boolean) => void;
   selectToSend: RNFS.ReadDirItem[];
   setSelectToSend: React.Dispatch<React.SetStateAction<RNFS.ReadDirItem[]>>;
 }
@@ -58,18 +57,14 @@ const categories: Category[] = [
   },
 ];
 
-const MediaPicker = ({
-  visible,
-  setVisible,
-  selectToSend,
-  setSelectToSend,
-}: MediaPickerProps) => {
+const MediaPicker = ({ selectToSend, setSelectToSend }: MediaPickerProps) => {
   const [loading, setLoading] = useState(true);
   const { colorScheme } = useTheme();
   const [files, setFiles] = useState<RNFS.ReadDirItem[]>([]);
   const [selectedCategory, setSelectedCategory] = useState<Category>(
     categories[0]
   );
+  const [visible, setVisible] = useState(false);
 
   useEffect(() => {
     const loadFiles = async () => {
@@ -159,80 +154,141 @@ const MediaPicker = ({
   };
 
   return (
-    <BottomSheet visible={visible} onRequestClose={handleClose} height={550}>
-      <View style={styles.categoryTabs}>
-        {categories.map((category) => (
-          <TouchableOpacity
-            key={category.name}
-            style={[
-              styles.categoryButton,
-              selectedCategory.name === category.name &&
-                styles.selectedCategory,
-            ]}
-            onPress={() => setSelectedCategory(category)}
-          >
-            <Text style={styles.categoryText}>{category.name}</Text>
-          </TouchableOpacity>
-        ))}
-      </View>
-
-      {loading ? (
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator color={Colors[colorScheme].tint} size={50} />
-        </View>
-      ) : (
-        <ScrollView
-          style={{ marginTop: 10 }}
-          contentContainerStyle={styles.files}
-          showsVerticalScrollIndicator={false}
-        >
-          {files.length > 0 ? (
-            files.map((file) => (
-              <TouchableOpacity
-                key={file.path}
-                style={[
-                  styles.fileItem,
-                  {
-                    backgroundColor: selectToSend.some(
-                      (f) => f.path === file.path
-                    )
-                      ? Colors[colorScheme].tint
-                      : Colors[colorScheme].itemBackground,
-                  },
-                ]}
-                onPress={() => toggleFileSelection(file)}
-              >
-                <Image
-                  source={{ uri: `file://${file.path}` }}
-                  style={{ height: 40, width: 40 }}
-                />
-                <View style={{ flexDirection: "column", gap: 5, width: '100%' }}>
-                  <StyledText style={styles.fileName}>{file.name}</StyledText>
-                  <StyledText style={styles.fileName}>
-                    {formatFileSize(file.size)}
-                  </StyledText>
-                </View>
-              </TouchableOpacity>
-            ))
-          ) : (
-            <Text style={styles.noFilesText}>No files found</Text>
-          )}
-        </ScrollView>
-      )}
-
+    <>
       <TouchableOpacity
-        onPress={handleSelection}
-        disabled={selectToSend.length === 0}
-        style={[
-          styles.sendButton,
-          { opacity: selectToSend.length === 0 ? 0.5 : 1 },
-        ]}
+        onPress={() => setVisible(!visible)}
+        style={{
+          padding: 15,
+          backgroundColor: Colors[colorScheme].tint,
+          borderRadius: 20,
+          alignItems: "center",
+          justifyContent: "center",
+          width: "45%",
+        }}
       >
-        <Text style={styles.sendButtonText}>
-          Send {selectToSend.length} Files
-        </Text>
+        <StyledText fontSize={20} fontWeight="bold" text="Select to Send" />
       </TouchableOpacity>
-    </BottomSheet>
+      <BottomSheet visible={visible} onRequestClose={handleClose} height={550}>
+        <View style={{ gap: 10, flex: 1, width: "100%" }}>
+          <View style={styles.categoryTabs}>
+            {categories.map((category) => (
+              <TouchableOpacity
+                key={category.name}
+                style={[
+                  styles.categoryButton,
+                  selectedCategory.name === category.name &&
+                    styles.selectedCategory,
+                ]}
+                onPress={() => setSelectedCategory(category)}
+              >
+                <StyledText fontSize={16} isEllipsis fontWeight="bold">
+                  {category.name}
+                </StyledText>
+              </TouchableOpacity>
+            ))}
+          </View>
+          <View style={{ flex: 1, width: "100%" }}>
+            {loading ? (
+              <View style={styles.loadingContainer}>
+                <ActivityIndicator color={Colors[colorScheme].tint} size={50} />
+              </View>
+            ) : (
+              <FlatList
+                showsVerticalScrollIndicator={false}
+                ListEmptyComponent={
+                  <StyledText
+                    fontSize={20}
+                    fontWeight="bold"
+                    style={{ textAlign: "center" }}
+                    text="No files available to share"
+                  />
+                }
+                keyExtractor={(file) => file.path}
+                data={files}
+                style={{ flex: 1 }}
+                contentContainerStyle={{
+                  gap: 5,
+                  width: "100%",
+                }}
+                renderItem={(file) => (
+                  <TouchableOpacity
+                    key={file.item.path}
+                    style={[
+                      styles.fileItem,
+                      {
+                        backgroundColor: selectToSend.some(
+                          (f) => f.path === file.item.path
+                        )
+                          ? Colors[colorScheme].tint
+                          : Colors[colorScheme].transparent,
+                      },
+                    ]}
+                    onPress={() => toggleFileSelection(file.item)}
+                  >
+                    <View
+                      style={{
+                        flex: 1,
+                        width: "100%",
+                        flexDirection: "row",
+                        gap: 10,
+                        overflow: "hidden",
+                      }}
+                    >
+                      {getFileType(file.item) == "audio" ? (
+                        <Icon
+                          filter={1}
+                          source={icons.audio}
+                          height={40}
+                          width={30}
+                        />
+                      ) : getFileType(file.item) == "document" ? (
+                        <Icon
+                          filter={1}
+                          height={40}
+                          source={icons.document}
+                          width={30}
+                        />
+                      ) : (
+                        <Image
+                          source={{ uri: `file://${file.item.path}` }}
+                          style={{ height: 50, width: 50, borderRadius: 10 }}
+                        />
+                      )}
+                      <StyledText
+                        style={{ width: "80%" }}
+                        fontSize={16}
+                        fontWeight="bold"
+                        isEllipsis
+                      >
+                        {file.item.name}
+                      </StyledText>
+                    </View>
+                    <StyledText>{formatFileSize(file.item.size)}</StyledText>
+                  </TouchableOpacity>
+                )}
+              />
+            )}
+          </View>
+          <TouchableOpacity
+            onPress={handleSelection}
+            disabled={selectToSend.length === 0}
+            style={[
+              styles.sendButton,
+              { opacity: selectToSend.length === 0 ? 0.5 : 1 },
+            ]}
+          >
+            <StyledText
+              fontSize={20}
+              fontWeight="bold"
+              isEllipsis
+              style={{ textAlign: "center" }}
+            >
+              Selected {selectToSend.length} Files
+            </StyledText>
+          </TouchableOpacity>
+        </View>
+      </BottomSheet>
+    </>
   );
 };
 
@@ -255,50 +311,25 @@ const MediaPickerStyles = (colorScheme: "dark" | "light") =>
     selectedCategory: {
       backgroundColor: Colors[colorScheme].tint,
     },
-    categoryText: {
-      color: Colors[colorScheme].text,
-      fontSize: 14,
-      textAlign: "center",
-    },
-    files: {
-      gap: 5,
-      width: "100%",
-    },
     fileItem: {
       borderRadius: 10,
-      alignItems: "center",
-      flexDirection: "row",
-      width: "100%",
       padding: 10,
       gap: 10,
-    },
-    fileName: {
-      color: Colors[colorScheme].text,
-      fontSize: 15,
-      overflow: "hidden",
-      width: screenWidth - 100,
+      flexDirection: "row",
+      justifyContent: "space-between",
+      height: 70,
+      alignItems: "center",
     },
     loadingContainer: {
       flex: 1,
       justifyContent: "center",
       alignItems: "center",
     },
-    noFilesText: {
-      color: "#bbb",
-      fontSize: 14,
-      textAlign: "center",
-    },
     sendButton: {
       backgroundColor: Colors[colorScheme].tint,
       padding: 15,
       borderRadius: 20,
       width: "70%",
-      marginTop: 10,
       alignSelf: "center",
-    },
-    sendButtonText: {
-      color: Colors[colorScheme].text,
-      fontSize: 20,
-      textAlign: "center",
     },
   });

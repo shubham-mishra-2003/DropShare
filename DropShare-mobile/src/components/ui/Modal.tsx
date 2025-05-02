@@ -5,12 +5,18 @@ interface ModalProps {
   children: React.ReactNode;
   visible: boolean;
   onRequestClose?: () => void;
+  animationType?: "slide" | "fade" | "none";
 }
 
-const DropShareModal = ({ visible, onRequestClose, children }: ModalProps) => {
+const DropShareModal = ({
+  visible,
+  onRequestClose,
+  children,
+  animationType = "slide",
+}: ModalProps) => {
   return (
     <Modal
-      animationType="slide"
+      animationType={animationType}
       transparent={true}
       visible={visible}
       onRequestClose={onRequestClose}

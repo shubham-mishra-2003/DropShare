@@ -38,7 +38,7 @@ const Loading = () => {
           { transform: [{ rotate: rotationInterpolation }] },
         ]}
       />
-      <StatusBar />
+      {/* <StatusBar /> */}
       <Text style={styles.text}>DropShare</Text>
     </View>
   );

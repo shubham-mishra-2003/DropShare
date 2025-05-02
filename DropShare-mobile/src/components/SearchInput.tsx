@@ -18,10 +18,12 @@ import BreakerText from "./ui/BreakerText";
 import { fileType } from "../utils/FileSystemUtil";
 import LinearGradient from "react-native-linear-gradient";
 import StyledText from "./ui/StyledText";
+import useSettingsButton from "../hooks/useSettingsButton";
 
 const SearchComponent = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const [filteredFiles, setFilteredFiles] = useState<any[]>([]);
+  const { settings } = useSettingsButton();
 
   const handleSearch = async (text: string) => {
     setSearchQuery(text);
@@ -29,13 +31,14 @@ const SearchComponent = () => {
       setFilteredFiles([]);
       return;
     }
-    searchFiles(text, (results) => {
+    searchFiles(text, settings.enableSmartSearch, (results) => {
       setFilteredFiles(results);
     });
   };
 
   const { colorScheme } = useTheme();
   const { setCurrentPath } = useCurrentPath(RNFS.ExternalStorageDirectoryPath);
+  const [isFocused, setIsFocused] = useState(false);
 
   const handleDirectoryRouting = (path: string) => {
     setCurrentPath(path);
@@ -76,19 +79,25 @@ const SearchComponent = () => {
       colors={Colors[colorScheme].linearGradientColors}
       style={{
         flex: 1,
-        backgroundColor: Colors[colorScheme].background,
       }}
     >
       <View style={{ paddingHorizontal: 10, paddingTop: 10, gap: 10 }}>
         <View
           style={{
             flexDirection: "row",
-            backgroundColor: Colors[colorScheme].itemBackground,
+            backgroundColor: Colors[colorScheme].transparent,
             alignItems: "center",
             gap: 5,
             paddingHorizontal: 10,
             borderRadius: 20,
-            height: 45,
+            height: 50,
+            borderWidth: 1,
+            borderColor: isFocused
+              ? Colors[colorScheme].tint
+              : colorScheme === "light"
+              ? "#99a6bd"
+              : "#566173",
+            overflow: "hidden",
           }}
         >
           <Icon source={icons.search} height={20} width={20} filter={0.7} />
@@ -97,16 +106,18 @@ const SearchComponent = () => {
             placeholderTextColor={colorScheme == "dark" ? "#bbb" : "#666666"}
             style={{
               color: Colors[colorScheme].text,
-              fontWeight: "bold",
               flex: 1,
               fontSize: 20,
               textAlignVertical: "bottom",
               height: "100%",
-              fontFamily: "WinkySans-BoldItalic",
+              fontFamily: "DancingScript-Bold",
+              backgroundColor: Colors[colorScheme].transparent,
             }}
             value={searchQuery}
             onChangeText={handleSearch}
             autoFocus={true}
+            onFocus={() => setIsFocused(true)}
+            onBlur={() => setIsFocused(false)}
           />
         </View>
         <FlatList

@@ -1,4 +1,11 @@
-import { Modal, Text, TextInput, TouchableOpacity, Vibration, View } from "react-native";
+import {
+  Modal,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  Vibration,
+  View,
+} from "react-native";
 import React, { useState } from "react";
 import RNFS from "react-native-fs";
 
@@ -7,6 +14,7 @@ import { FilesListStyles } from "../../constants/Styles";
 import { Toast } from "../Toasts";
 import DropShareModal from "../ui/Modal";
 import StyledText from "../ui/StyledText";
+import { Colors } from "../../constants/Colors";
 
 interface FileCreateProps {
   createVisible: boolean;
@@ -49,32 +57,66 @@ const CreateFolder = ({
   };
 
   return (
-    <DropShareModal visible={createVisible} onRequestClose={() => closeModal()}>
-      <View style={styles.modal}>
-        <View style={styles.editContainer}>
+    <DropShareModal
+      animationType="fade"
+      visible={createVisible}
+      onRequestClose={() => closeModal()}
+    >
+      <View style={{ justifyContent: "center", alignItems: "center", flex: 1 }}>
+        <View style={styles.modal}>
+          <StyledText text="Create Folder" fontWeight="bold" fontSize={24} />
           <TextInput
+            style={{
+              width: "100%",
+              borderWidth: 1,
+              borderColor: Colors[colorScheme].tint,
+              padding: 10,
+              paddingHorizontal: 20,
+              borderRadius: 50,
+              color: Colors[colorScheme].text,
+              fontSize: 18,
+              fontWeight: "bold",
+              height: 60,
+            }}
+            placeholder="Enter folder name"
+            placeholderTextColor={Colors[colorScheme].text}
             value={folderName}
             onChangeText={(text) => setFolderName(text)}
-            style={styles.input}
-            placeholderTextColor="#bbb"
-            placeholder="Enter file name"
           />
-          <View style={styles.buttonContainer}>
-            <TouchableOpacity onPress={() => closeModal()}>
-              <StyledText
-                text="Cancel"
-                fontSize={22}
-                style={styles.modalbutton}
-                fontWeight="bold"
-              />
+          <View
+            style={{
+              gap: 10,
+              flexDirection: "row",
+              alignItems: "center",
+              justifyContent: "flex-end",
+              width: "100%",
+            }}
+          >
+            <TouchableOpacity
+              style={{
+                backgroundColor: Colors[colorScheme].tint,
+                paddingHorizontal: 25,
+                paddingVertical: 10,
+                borderRadius: 50,
+              }}
+              onPress={() => {
+                closeModal();
+              }}
+            >
+              <StyledText text="Cancel" fontWeight="bold" fontSize={20} />
             </TouchableOpacity>
-            <TouchableOpacity onPress={() => handleCreate()}>
-              <StyledText
-                text="Create"
-                fontSize={22}
-                style={styles.modalbutton}
-                fontWeight="bold"
-              />
+            <TouchableOpacity
+              style={{
+                backgroundColor: Colors[colorScheme].tint,
+                paddingHorizontal: 25,
+                paddingVertical: 10,
+                borderRadius: 50,
+              }}
+              onPress={() => {
+                handleCreate();
+              }}
+            >
+              <StyledText text="Create" fontWeight="bold" fontSize={20} />
             </TouchableOpacity>
           </View>
         </View>

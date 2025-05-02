@@ -21,6 +21,7 @@ import Icon from "../components/Icon";
 import { icons } from "../assets";
 import ThemeSwitch from "../components/ThemeSwitch";
 import { Toast } from "../components/Toasts";
+import { SafeAreaView } from "react-native-safe-area-context";
 
 const SettingsPage = () => {
   const { toggleSetting, getSetting } = useSettingsButton();
@@ -43,12 +44,12 @@ const SettingsPage = () => {
       value: getSetting("showHiddenFiles"),
       subtitle: "Show hidden files in the file system",
     },
-    {
-      title: "Enable Smart Search",
-      key: "enableSmartSearch",
-      value: getSetting("enableSmartSearch"),
-      subtitle: "Get Smart Search results with in-device AI",
-    },
+    // {
+    //   title: "Enable Smart Search",
+    //   key: "enableSmartSearch",
+    //   value: getSetting("enableSmartSearch"),
+    //   subtitle: "Get Smart Search results with in-device AI",
+    // },
   ];
 
   const handleSetting = (key: string) => {

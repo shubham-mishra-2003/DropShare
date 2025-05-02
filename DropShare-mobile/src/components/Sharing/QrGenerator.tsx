@@ -63,13 +63,10 @@ const QRGenerator: React.FC<QRGeneratorProps> = ({ visible, setVisible }) => {
     if (visible) {
       startHostingAndSetQr();
     }
-  }, [visible]);
-
-  useEffect(() => {
     if (isHostConnected) {
-      navigate("connection");
+      navigate("connectionscreen");
     }
-  }, [isHostConnected]);
+  }, [visible, isHostConnected]);
 
   return (
     <BottomSheet visible={visible} onRequestClose={modalClose} height={500}>

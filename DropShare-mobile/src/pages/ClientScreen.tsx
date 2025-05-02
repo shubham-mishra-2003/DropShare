@@ -107,7 +107,7 @@ const ClientScreen: FC = () => {
 
   useEffect(() => {
     if (isClientConnected) {
-      navigate("clientConnection");
+      navigate("connectionscreen");
     }
   }, [isClientConnected]);
 

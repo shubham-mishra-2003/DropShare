@@ -211,7 +211,7 @@ const FileViewer: React.FC = () => {
                   <Image
                     source={{ uri: itemPath }}
                     style={localStyle.media}
-                    resizeMode="contain" 
+                    resizeMode="contain"
                     onError={() => {
                       setIsLoading(false);
                       if (loadingTimeoutRef.current) {
@@ -379,7 +379,7 @@ const FileViewer: React.FC = () => {
           backgroundColor: Colors[colorScheme].background,
         }}
       >
-        <TouchableOpacity style={{ padding: 10 }}>
+        <TouchableOpacity onPress={goBack} style={{ padding: 10 }}>
           <Icon source={icons.back} filter={1} height={20} width={20} />
         </TouchableOpacity>
         <StyledText

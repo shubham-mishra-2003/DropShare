@@ -10,24 +10,37 @@ const scanDirectoryRecursive = async (
   const restrictedDirs = [
     "/storage/emulated/0/Android/data",
     "/storage/emulated/0/Android/obb",
-    "/storage/emulated/0/WhatsApp/Databases",
     "/storage/emulated/0/WhatsApp",
+    "/storage/emulated/0/WhatsApp/Databases",
+    "/storage/emulated/0/WhatsApp/Media",
+    "/storage/emulated/0/WhatsApp/Backups",
     "/storage/emulated/0/Telegram",
     "/storage/emulated/0/DCIM/.thumbnails",
     "/storage/emulated/0/Download/cache",
+    "/storage/emulated/0/.cache",
   ];
 
+  // Skip hidden folders/files and restricted directories
   if (
+    directoryPath.split("/").pop()?.startsWith(".") ||
     restrictedDirs.some((dir) => directoryPath.includes(dir)) ||
     currentDepth > maxDepth
   ) {
-    console.log(`Skipping path: ${directoryPath} (restricted or too deep)`);
+    console.log(
+      `Skipping path: ${directoryPath} (hidden, restricted, or too deep)`
+    );
     return [];
   }
 
   try {
     const files = await RNFS.readDir(directoryPath);
     for (const file of files) {
+      // Skip hidden files/folders
+      if (file.name.startsWith(".")) {
+        console.log(`Skipping hidden item: ${file.path}`);
+        continue;
+      }
+
       results.push(file);
       if (file.isDirectory() && currentDepth < maxDepth) {
         const subFiles = await scanDirectoryRecursive(

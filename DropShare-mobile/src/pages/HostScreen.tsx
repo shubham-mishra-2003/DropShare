@@ -46,6 +46,12 @@ const HostScreen: FC = () => {
     return () => backHandler.remove();
   }, []);
 
+  useEffect(() => {
+    if (isHostConnected) {
+      navigate("connectionscreen");
+    }
+  }, [isHostConnected]);
+
   return (
     <LinearGradient
       start={{ x: 0, y: 0 }}
@@ -154,10 +160,10 @@ const HostScreen: FC = () => {
           setVisible={() => setIsScanner(false)}
           visible={isScanner}
         />
-        <StatusBar
+        {/* <StatusBar
           backgroundColor={Colors[colorScheme].background}
           barStyle={"default"}
-        />
+        /> */}
       </ScrollView>
     </LinearGradient>
   );

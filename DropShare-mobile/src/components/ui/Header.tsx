@@ -5,8 +5,7 @@ import { icons, images } from "../../assets";
 import ThemeSwitch from "../ThemeSwitch";
 import { headerStyles } from "../../constants/Styles";
 import { useTheme } from "../../hooks/ThemeProvider";
-import { fileOperations, ConstantProps } from "../../utils/FileSystemUtil";
-import useSelectFile from "../../hooks/useSelectFile";
+import { fileOperations } from "../../utils/FileSystemUtil";
 import StyledText from "./StyledText";
 
 interface HeaderProps {
@@ -20,7 +19,6 @@ const Header: React.FC<HeaderProps> = ({
   onPress,
   page = "home",
   menu = false,
-  filePath,
 }) => {
   const [showOptions, setShowOptions] = useState(false);
   const { colorScheme } = useTheme();

@@ -293,6 +293,7 @@ export const extractTextFromFile = async (
     return "";
   }
 };
+
 export const getFileCategory = (fileName: string): string => {
   const ext = fileName.split(".").pop()?.toLowerCase() || "";
   if (["jpg", "png", "jpeg", "gif"].includes(ext)) return "Image";
@@ -301,6 +302,7 @@ export const getFileCategory = (fileName: string): string => {
   if (["mp3", "wav", "flac"].includes(ext)) return "Audio";
   return "Other";
 };
+
 export const insertFile = async (
   name: string,
   path: string,
@@ -311,9 +313,10 @@ export const insertFile = async (
   if (!database) return;
   const type = isDirectory() ? "folder" : "file";
   const category = getFileCategory(name);
-  let aiTags = null;
-  let contentSummary = null;
+  let aiTags: string | null = null;
+  let contentSummary: string | null = null;
 
+  // Only perform AI-related processing if enableSmartSearch is true
   if (enableSmartSearch) {
     if (category === "Image") {
       try {
@@ -346,6 +349,7 @@ export const searchFiles = (
 ): void => {
   if (!database) return;
 
+  // Explicitly define SQL query based on enableSmartSearch
   const sqlQuery = enableSmartSearch
     ? `SELECT * FROM files WHERE name LIKE ? OR category LIKE ? OR ai_tags LIKE ? OR content_summary LIKE ?`
     : `SELECT * FROM files WHERE name LIKE ? OR category LIKE ?`;
@@ -370,6 +374,7 @@ export const startIndexing = async (
   if (!database) return;
   const files = await scanEntireStorage();
   const batchSize = 50;
+
   for (let i = 0; i < files.length; i += batchSize) {
     const batch = files.slice(i, i + batchSize);
     await Promise.all(

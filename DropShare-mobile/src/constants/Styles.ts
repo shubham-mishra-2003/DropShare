@@ -21,7 +21,7 @@ export const splashScreenStyles = StyleSheet.create({
 export const headerStyles = (colorScheme: "light" | "dark") =>
   StyleSheet.create({
     header: {
-      paddingHorizontal: 2,
+      padding: 2,
       backgroundColor: Colors[colorScheme].background,
       flexDirection: "row",
       justifyContent: "space-between",
@@ -260,9 +260,6 @@ export const sidebarStyles = (colorScheme: "light" | "dark") =>
       left: 0,
       right: 0,
     },
-    text: {
-      fontSize: 20,
-    },
     sidebar: {
       position: "absolute",
       top: 0,
@@ -286,7 +283,7 @@ export const sidebarStyles = (colorScheme: "light" | "dark") =>
     logo: {
       alignItems: "center",
       gap: 10,
-      padding: 10,
+      paddingTop: 30,
       flexDirection: "row",
       justifyContent: "center",
     },
@@ -348,9 +345,15 @@ export const FilesListStyles = (colorScheme: "light" | "dark") =>
       boxShadow: `0px 0px 10px ${Colors[colorScheme].tint}`,
     },
     modal: {
-      flex: 1,
       justifyContent: "center",
       alignItems: "center",
+      padding: 20,
+      borderRadius: 20,
+      backgroundColor: Colors[colorScheme].background,
+      borderWidth: 2,
+      borderColor: Colors[colorScheme].border,
+      width: "85%",
+      gap: 20,
     },
     editContainer: {
       backgroundColor: Colors[colorScheme].itemBackground,
@@ -525,8 +528,9 @@ export const nearByDevicesStyles = (colorScheme: "dark" | "light") =>
       backgroundColor: Colors[colorScheme].tint,
       padding: 15,
       borderRadius: 50,
-      marginHorizontal: 40,
+      width: "65%",
       marginVertical: 5,
+      alignSelf: "center",
     },
     shareText: {
       color: Colors[colorScheme].text,
@@ -574,10 +578,12 @@ export const connectionStyles = (colorScheme: "dark" | "light") =>
       padding: 10,
       borderRadius: 20,
       height: 400,
+      marginTop: 10,
     },
     sendReceiveContainer: {
       flexDirection: "row",
       justifyContent: "center",
+      gap: 10,
     },
     selectedFileButtonContainer: {
       flexDirection: "row",
@@ -599,17 +605,6 @@ export const connectionStyles = (colorScheme: "dark" | "light") =>
       padding: 10,
       backgroundColor: Colors[colorScheme].transparent,
       borderRadius: 10,
-    },
-    selectedFileContainer: {
-      flex: 1,
-      marginTop: 20,
-      backgroundColor: Colors[colorScheme].transparent,
-      justifyContent: "center",
-      alignItems: "center",
-      paddingHorizontal: 10,
-      paddingBottom: 10,
-      borderRadius: 20,
-      height: 400,
     },
     selectedFileItem: {
       flexDirection: "row",
