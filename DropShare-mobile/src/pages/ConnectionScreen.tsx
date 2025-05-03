@@ -152,11 +152,11 @@ const ConnectionScreen: React.FC = () => {
           {item.fileName}
         </StyledText>
         <View style={styles.transferDetails}>
-          <StyledText fontSize={16} fontWeight="bold" isEllipsis>
+          <StyledText fontSize={14} fontWeight="bold" isEllipsis>
             {item.status} • {formatFileSize(item.transferredBytes)}
           </StyledText>
           <StyledText fontSize={14} fontWeight="bold">
-            Speed: {item.speed}
+            Speed: {formatFileSize(item.speed)}/s
           </StyledText>
         </View>
         {item.status != "Completed" && (
@@ -365,8 +365,8 @@ const createStyles = (colorScheme: "light" | "dark") =>
     },
     messageButton: {
       position: "absolute",
-      bottom: 75,
-      right: 20,
+      bottom: 85,
+      right: 10,
       backgroundColor: Colors[colorScheme].tint,
       borderRadius: 30,
       padding: 12,

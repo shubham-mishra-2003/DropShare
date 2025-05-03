@@ -77,7 +77,7 @@ declare global {
     fileName: string;
     transferredBytes: number;
     fileSize: number;
-    speed: string;
+    speed: number;
     status: "Sending" | "Receiving" | "Completed" | "Failed";
     error?: string;
   }
@@ -88,7 +88,7 @@ declare global {
     fileSize: number;
     deviceName: string;
     senderIp: string;
-    chunks: (Buffer | undefined)[];
+    chunks: Buffer[];
     receivedBytes: number;
     startTime: number;
     totalChunks: number;
@@ -102,7 +102,9 @@ declare global {
     aesKey?: string;
     iv?: string;
     lastChunkIndex: number;
+    speedWindow: { bytes: number; timestamp: number }[];
   }
+
   interface UdpSocket {
     bind(port: number): void;
     on(event: "listening", listener: () => void): void;
