@@ -18,8 +18,6 @@ import HostScreen from "./pages/HostScreen";
 import ClientScreen from "./pages/ClientScreen";
 import SettingsPage from "./pages/SettingsPage";
 import Home from "./pages/HomePage";
-import HostConnection from "./pages/HostConnection";
-import ClientConnection from "./pages/ClientConnection";
 import { NetworkProvider } from "./service/NetworkProvider";
 import { startIndexing } from "./db/dropshareDb";
 import { Colors } from "./constants/Colors";
@@ -86,13 +84,8 @@ const RootLayout = () => {
                 <Stack.Screen name="hostscreen" component={HostScreen} />
                 <Stack.Screen name="clientscreen" component={ClientScreen} />
                 <Stack.Screen
-                  name="hostconnection"
-                  component={HostConnection}
-                />
-                <Stack.Screen name="connectionscreen" component={ConnectionScreen} />
-                <Stack.Screen
-                  name="clientconnection"
-                  component={ClientConnection}
+                  name="connectionscreen"
+                  component={ConnectionScreen}
                 />
               </Stack.Navigator>
             </NavigationContainer>

@@ -1011,3 +1011,5 @@ export const Sharing = (role: "host" | "client") => {
     receiveFile,
   };
 };
+
+// Increasing speed
