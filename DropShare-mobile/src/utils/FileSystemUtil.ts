@@ -211,7 +211,7 @@ export const fileOperations = () => {
         results.push({
           file: file.name,
           success: false,
-          error: 'File path is required',
+          error: "File path is required",
         });
         continue;
       }
@@ -241,7 +241,7 @@ export const fileOperations = () => {
         results.push({
           file: file.name,
           success: false,
-          error: 'File path is required',
+          error: "File path is required",
         });
         continue;
       }
@@ -262,8 +262,8 @@ export const fileOperations = () => {
   const handleMoveToSafe = async ({
     selectedFiles,
     setSelectedFiles,
-    // safePath = path.join(RNFS.DocumentDirectoryPath, 'Safe'),
-  }: ConstantProps & { safePath?: string }) => {
+  }: // safePath = path.join(RNFS.DocumentDirectoryPath, 'Safe'),
+  ConstantProps & { safePath?: string }) => {
     const results: { file: string; success: boolean; error?: string }[] = [];
 
     try {
@@ -276,7 +276,7 @@ export const fileOperations = () => {
           results.push({
             file: file.name,
             success: false,
-            error: 'File path is required',
+            error: "File path is required",
           });
           continue;
         }
@@ -286,11 +286,19 @@ export const fileOperations = () => {
           // await RNFS.moveFile(file.path, destPath);
           results.push({ file: file.name, success: true });
         } catch (error) {
-          results.push({ file: file.name, success: false, error: String(error) });
+          results.push({
+            file: file.name,
+            success: false,
+            error: String(error),
+          });
         }
       }
     } catch (error) {
-      results.push({ file: 'Safe directory creation', success: false, error: String(error) });
+      results.push({
+        file: "Safe directory creation",
+        success: false,
+        error: String(error),
+      });
     }
 
     setSelectedFiles([]);
@@ -308,7 +316,7 @@ export const fileOperations = () => {
         results.push({
           file: file.name,
           success: false,
-          error: 'File path is required',
+          error: "File path is required",
         });
         continue;
       }
@@ -330,7 +338,7 @@ export const fileOperations = () => {
 
     for (const file of selectedFiles) {
       if (!file.path) {
-        results.push({ name: file.name, error: 'File path is required' });
+        results.push({ name: file.name, error: "File path is required" });
         continue;
       }
 
@@ -353,11 +361,13 @@ export const fileOperations = () => {
     const results: { file: string; success: boolean; error?: string }[] = [];
 
     if (selectedFiles.length !== newNames.length) {
-      return [{
-        file: 'Rename operation',
-        success: false,
-        error: 'Number of files and new names must match',
-      }];
+      return [
+        {
+          file: "Rename operation",
+          success: false,
+          error: "Number of files and new names must match",
+        },
+      ];
     }
 
     for (let i = 0; i < selectedFiles.length; i++) {
@@ -368,7 +378,7 @@ export const fileOperations = () => {
         results.push({
           file: file.name,
           success: false,
-          error: 'File path is required',
+          error: "File path is required",
         });
         continue;
       }
@@ -377,7 +387,7 @@ export const fileOperations = () => {
         results.push({
           file: file.name,
           success: false,
-          error: 'Invalid file name',
+          error: "Invalid file name",
         });
         continue;
       }

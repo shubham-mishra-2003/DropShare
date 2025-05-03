@@ -15705,6 +15705,7 @@ export const Sharing = (role: "host" | "client") => {
             if (!(await RNFS.exists(TEMP_CHUNKS_PATH))) {
               await RNFS.mkdir(TEMP_CHUNKS_PATH);
             }
+
             await RNFS.appendFile(tempPath, base64Chunk, "base64");
 
             const transfer = fileTransfers.get(chunkData.fileId);
@@ -16043,6 +16044,9 @@ export const Sharing = (role: "host" | "client") => {
     }
 
     const tempPath = `${TEMP_CHUNKS_PATH}/${fileId}`;
+    if(!(await RNFS.exists(TEMP_CHUNKS_PATH))) {
+        await RNFS.mkdir(TEMP_CHUNKS_PATH)
+    }
     await RNFS.writeFile(tempPath, "", "base64");
 
     const transfer: FileTransfer = {
