@@ -72,6 +72,12 @@ declare module "*.png" {
 }
 
 declare global {
+  interface message {
+    ip: string;
+    name: string;
+    message: string;
+  }
+  
   interface TransferProgress {
     fileId: string;
     fileName: string;

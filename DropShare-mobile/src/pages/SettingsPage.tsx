@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react"; // Add useEffect
 import {
   View,
   StyleSheet,
@@ -8,7 +8,6 @@ import {
   ScrollView,
 } from "react-native";
 import { goBack } from "../utils/NavigationUtil";
-import Header from "../components/ui/Header";
 import useSettingsButton from "../hooks/useSettingsButton";
 import CustomToggleSwitch from "../components/ui/CustomToggleSwitch";
 import LinearGradient from "react-native-linear-gradient";
@@ -21,7 +20,6 @@ import Icon from "../components/Icon";
 import { icons } from "../assets";
 import ThemeSwitch from "../components/ThemeSwitch";
 import { Toast } from "../components/Toasts";
-import { SafeAreaView } from "react-native-safe-area-context";
 
 const SettingsPage = () => {
   const { toggleSetting, getSetting } = useSettingsButton();
@@ -29,11 +27,24 @@ const SettingsPage = () => {
   const { username, saveUsername } = useUsername();
   const [inputValue, setInputValue] = useState(username);
   const [isFocused, setIsFocused] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const handleSubmit = () => {
+  useEffect(() => {
+    setInputValue(username);
+  }, [username]);
+
+  const handleSubmit = async () => {
     if (inputValue.trim()) {
-      saveUsername(inputValue.trim());
-      setInputValue(username);
+      setIsSubmitting(true);
+      try {
+        await saveUsername(inputValue.trim());
+      } catch (error) {
+        Toast("Error saving username");
+      } finally {
+        setIsSubmitting(false);
+      }
+    } else {
+      Toast("Username cannot be empty");
     }
   };
 
@@ -44,12 +55,6 @@ const SettingsPage = () => {
       value: getSetting("showHiddenFiles"),
       subtitle: "Show hidden files in the file system",
     },
-    // {
-    //   title: "Enable Smart Search",
-    //   key: "enableSmartSearch",
-    //   value: getSetting("enableSmartSearch"),
-    //   subtitle: "Get Smart Search results with in-device AI",
-    // },
   ];
 
   const handleSetting = (key: string) => {
@@ -67,7 +72,8 @@ const SettingsPage = () => {
     >
       <View
         style={{
-          padding: 15,
+          paddingHorizontal: 15,
+          paddingVertical: 10,
           backgroundColor: Colors[colorScheme].background,
           flexDirection: "row",
           justifyContent: "space-between",
@@ -99,10 +105,15 @@ const SettingsPage = () => {
               autoFocus={false}
             />
             <TouchableOpacity
-              style={styles.submitButton}
+              style={[styles.submitButton, isSubmitting && { opacity: 0.6 }]}
               onPress={handleSubmit}
+              disabled={isSubmitting} // Disable button while submitting
             >
-              <StyledText text="Submit" fontWeight="bold" fontSize={22} />
+              <StyledText
+                text={isSubmitting ? "Saving..." : "Submit"}
+                fontWeight="bold"
+                fontSize={22}
+              />
             </TouchableOpacity>
           </View>
           <View style={{ gap: 5 }}>

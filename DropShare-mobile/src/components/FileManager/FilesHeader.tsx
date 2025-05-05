@@ -85,7 +85,8 @@ const FilesHeader = ({
   return (
     <View
       style={{
-        padding: 10,
+        paddingHorizontal: 15,
+        paddingVertical: 10,
         backgroundColor: Colors[colorScheme].background,
         flexDirection: "row",
         justifyContent: "center",

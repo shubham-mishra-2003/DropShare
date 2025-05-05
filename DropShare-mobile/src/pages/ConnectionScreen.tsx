@@ -1,11 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
-import {
-  View,
-  FlatList,
-  TouchableOpacity,
-  StyleSheet,
-  BackHandler,
-} from "react-native";
+import { View, FlatList, TouchableOpacity, BackHandler } from "react-native";
 import { ProgressBar } from "@react-native-community/progress-bar-android";
 import { useNetwork } from "../service/NetworkProvider";
 import RNFS from "react-native-fs";
@@ -14,7 +8,7 @@ import { useTheme } from "../hooks/ThemeProvider";
 import MediaPicker from "../components/MediaPicker";
 import StyledText from "../components/ui/StyledText";
 import LinearGradient from "react-native-linear-gradient";
-import { navigate, resetAndNavigate } from "../utils/NavigationUtil";
+import { resetAndNavigate } from "../utils/NavigationUtil";
 import DropShareModal from "../components/ui/Modal";
 import MessageView from "../components/MessageView";
 import Icon from "../components/Icon";
@@ -22,6 +16,7 @@ import { icons } from "../assets";
 import { Toast } from "../components/Toasts";
 import { formatFileSize } from "../utils/FileSystemUtil";
 import BreakerText from "../components/ui/BreakerText";
+import { ConnectionScreenStyles } from "../constants/Styles";
 
 const ConnectionScreen: React.FC = () => {
   const { colorScheme } = useTheme();
@@ -40,7 +35,7 @@ const ConnectionScreen: React.FC = () => {
   const [selectToSend, setSelectToSend] = useState<RNFS.ReadDirItem[]>([]);
   const [messageView, setMessageView] = useState(false);
 
-  const styles = createStyles(colorScheme);
+  const styles = ConnectionScreenStyles(colorScheme);
 
   const handleSendFiles = async () => {
     for (const file of selectToSend) {
@@ -78,13 +73,13 @@ const ConnectionScreen: React.FC = () => {
     return () => backHandler.remove();
   }, []);
 
-  // const [transfers, setTransfers] = useState<TransferProgress[]>([
+  // const [transferProgress, setTransfers] = useState<TransferProgress[]>([
   //   {
   //     fileId: "1",
   //     fileName: "document.pdf",
   //     transferredBytes: 5 * 1024,
   //     fileSize: 10 * 1024,
-  //     speed: formatFileSize(1024),
+  //     speed: 1024,
   //     status: "Sending",
   //   },
   //   {
@@ -92,7 +87,7 @@ const ConnectionScreen: React.FC = () => {
   //     fileName: "photo.jpg",
   //     transferredBytes: 5 * 1024,
   //     fileSize: 12.5 * 1024,
-  //     speed: formatFileSize(512),
+  //     speed: 512,
   //     status: "Receiving",
   //   },
   //   {
@@ -100,24 +95,8 @@ const ConnectionScreen: React.FC = () => {
   //     fileName: "video.mp4",
   //     transferredBytes: 5 * 1024,
   //     fileSize: 10 * 1024,
-  //     speed: formatFileSize(2048),
+  //     speed: 2048,
   //     status: "Sending",
-  //   },
-  //   {
-  //     fileId: "4",
-  //     fileName: "video.mp4",
-  //     transferredBytes: 5 * 1024,
-  //     fileSize: 10 * 1024,
-  //     speed: formatFileSize(2048),
-  //     status: "Sending",
-  //   },
-  //   {
-  //     fileId: "5",
-  //     fileName: "video.mp4",
-  //     transferredBytes: 5 * 1024,
-  //     fileSize: 10 * 1024,
-  //     speed: formatFileSize(2048),
-  //     status: "Completed",
   //   },
   // ]);
 
@@ -144,7 +123,7 @@ const ConnectionScreen: React.FC = () => {
     return (
       <View style={styles.transferInfo}>
         <StyledText
-          fontSize={18}
+          fontSize={16}
           fontWeight="bold"
           isEllipsis
           style={{ width: "90%" }}
@@ -152,10 +131,11 @@ const ConnectionScreen: React.FC = () => {
           {item.fileName}
         </StyledText>
         <View style={styles.transferDetails}>
-          <StyledText fontSize={14} fontWeight="bold" isEllipsis>
-            {item.status} • {formatFileSize(item.transferredBytes)}
+          <StyledText fontSize={12} fontWeight="bold" isEllipsis>
+            {item.status} • {formatFileSize(item.transferredBytes)} /{" "}
+            {formatFileSize(item.fileSize)}
           </StyledText>
-          <StyledText fontSize={14} fontWeight="bold">
+          <StyledText fontSize={12} fontWeight="bold">
             Speed: {formatFileSize(item.speed)}/s
           </StyledText>
         </View>
@@ -201,21 +181,9 @@ const ConnectionScreen: React.FC = () => {
               borderRadius: 20,
               maxHeight: 130,
             }}
-            contentContainerStyle={{ gap: 5, padding: 10 }}
+            contentContainerStyle={{ gap: 10, padding: 10 }}
             renderItem={(device) => (
-              <View
-                style={{
-                  flexDirection: "row",
-                  justifyContent: "space-between",
-                  gap: 10,
-                  paddingVertical: 15,
-                  paddingHorizontal: 15,
-                  backgroundColor: Colors[colorScheme].transparent,
-                  borderRadius: 20,
-                  borderWidth: 2,
-                  borderColor: Colors[colorScheme].itemBackground,
-                }}
-              >
+              <View style={styles.devicesList}>
                 <StyledText
                   fontSize={18}
                   fontWeight="bold"
@@ -257,7 +225,7 @@ const ConnectionScreen: React.FC = () => {
           }
           scrollEnabled={true}
           contentContainerStyle={{
-            gap: 5,
+            gap: 10,
             padding: 10,
           }}
         />
@@ -298,92 +266,5 @@ const ConnectionScreen: React.FC = () => {
     </LinearGradient>
   );
 };
-
-const createStyles = (colorScheme: "light" | "dark") =>
-  StyleSheet.create({
-    container: {
-      flex: 1,
-      backgroundColor: Colors[colorScheme].background,
-      paddingTop: 50,
-      paddingBottom: 30,
-    },
-    mainContent: {
-      paddingHorizontal: 20,
-      justifyContent: "space-between",
-      flex: 1,
-    },
-    subtitle: {
-      marginTop: 20,
-      marginBottom: 10,
-      textAlign: "center",
-    },
-    connectionStatus: {
-      backgroundColor: Colors[colorScheme].itemBackground,
-      padding: 10,
-      borderRadius: 8,
-      marginBottom: 10,
-      alignItems: "center",
-    },
-    transferCard: {
-      backgroundColor: Colors[colorScheme].itemBackground,
-      padding: 10,
-      borderRadius: 8,
-      marginVertical: 5,
-      flexDirection: "row",
-      alignItems: "center",
-      shadowColor: "#000",
-      shadowOffset: { width: 0, height: 1 },
-      shadowOpacity: 0.1,
-      shadowRadius: 2,
-      elevation: 1,
-    },
-    transferInfo: {
-      flex: 1,
-      backgroundColor: Colors[colorScheme].transparent,
-      borderRadius: 20,
-      borderWidth: 2,
-      borderColor: Colors[colorScheme].itemBackground,
-      padding: 10,
-      gap: 10,
-    },
-    transferDetails: {
-      flexDirection: "row",
-      justifyContent: "space-between",
-      marginTop: 5,
-      width: "100%",
-    },
-    progressBar: {
-      marginTop: 10,
-      height: 10,
-      borderRadius: 10,
-    },
-    noData: {
-      color: Colors[colorScheme].text + "80",
-      fontSize: 14,
-      textAlign: "center",
-      marginVertical: 10,
-    },
-    messageButton: {
-      position: "absolute",
-      bottom: 85,
-      right: 10,
-      backgroundColor: Colors[colorScheme].tint,
-      borderRadius: 30,
-      padding: 12,
-      elevation: 5,
-      shadowColor: "#000",
-      shadowOffset: { width: 0, height: 2 },
-      shadowOpacity: 0.3,
-      shadowRadius: 4,
-    },
-    sendButton: {
-      padding: 15,
-      backgroundColor: Colors[colorScheme].tint,
-      borderRadius: 20,
-      alignItems: "center",
-      justifyContent: "center",
-      width: "45%",
-    },
-  });
 
 export default ConnectionScreen;

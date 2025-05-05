@@ -8,22 +8,32 @@ const useUsername = () => {
   const name = DeviceInfo.getDeviceNameSync();
   const [username, setUsername] = useState<string>(name);
 
-  useEffect(() => {
-    const loadUsername = async () => {
+  const loadUsername = async () => {
+    try {
       const storedUsername = await AsyncStorage.getItem("username");
       if (storedUsername) setUsername(storedUsername);
-    };
+    } catch (error) {
+      Toast("Error loading username");
+    }
+  };
+
+  useEffect(() => {
     loadUsername();
   }, []);
 
   const saveUsername = async (newUsername: string) => {
-    await AsyncStorage.setItem("username", newUsername);
-    setUsername(newUsername);
-    Toast(`Username saved ${newUsername}`);
-    Vibration.vibrate(100);
+    try {
+      await AsyncStorage.setItem("username", newUsername);
+      setUsername(newUsername);
+      Toast(`Username saved: ${newUsername}`);
+      Vibration.vibrate(100);
+    } catch (error) {
+      Toast("Error saving username");
+      throw error;
+    }
   };
 
-  return { username, saveUsername };
+  return { username, saveUsername, loadUsername };
 };
 
 export default useUsername;

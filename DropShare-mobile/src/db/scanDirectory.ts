@@ -26,9 +26,9 @@ const scanDirectoryRecursive = async (
     restrictedDirs.some((dir) => directoryPath.includes(dir)) ||
     currentDepth > maxDepth
   ) {
-    console.log(
-      `Skipping path: ${directoryPath} (hidden, restricted, or too deep)`
-    );
+    // console.log(
+    //   `Skipping path: ${directoryPath} (hidden, restricted, or too deep)`
+    // );
     return [];
   }
 
@@ -64,6 +64,6 @@ export const scanEntireStorage = async (): Promise<RNFS.ReadDirItem[]> => {
     const files = await scanDirectoryRecursive(path);
     allFiles = [...allFiles, ...files];
   }
-  console.log(`✅ Scanned ${allFiles.length} items`);
+  // console.log(`✅ Scanned ${allFiles.length} items`);
   return allFiles;
 };

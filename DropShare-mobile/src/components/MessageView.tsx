@@ -1,47 +1,57 @@
 import {
   View,
-  Text,
   StyleSheet,
   TouchableOpacity,
   FlatList,
   TextInput,
 } from "react-native";
-import React, { useState } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import LinearGradient from "react-native-linear-gradient";
 import { Colors } from "../constants/Colors";
 import { useTheme } from "../hooks/ThemeProvider";
 import Icon from "./Icon";
-import { icons, images } from "../assets";
+import { icons } from "../assets";
 import StyledText from "./ui/StyledText";
 import { useNetwork } from "../service/NetworkProvider";
-import { getIpAddress } from "react-native-device-info";
-import {
-  getBroadcastIPAddress,
-  getLocalIPAddress,
-} from "../utils/NetworkUtils";
+import { getLocalIPAddress } from "../utils/NetworkUtils";
 
+interface processedMessages extends message {
+  isSelf: boolean;
+}
 const MessageView = ({
   setMessageView,
 }: {
   setMessageView: (value: boolean) => void;
 }) => {
   const { colorScheme } = useTheme();
-  const { disconnect, sendMessage, devices, messages } = useNetwork();
+  const { sendMessage, messages } = useNetwork();
   const styles = messageScreenStyles(colorScheme);
   const [message, setMessage] = useState("");
   const [focused, setFocused] = useState(false);
+  const [processedMessages, setProcessedMessages] = useState<
+    processedMessages[]
+  >([]);
 
-  const getDeviceIp = async () => {
-    const deviceIp = await getLocalIPAddress();
-    return deviceIp;
-  };
+  const flatListRef = useRef<FlatList>(null);
 
-  const deviceIp = getDeviceIp();
+  useEffect(() => {
+    const processMessages = async () => {
+      const localIp = await getLocalIPAddress();
+      const updatedMessages = messages.map((msg) => ({
+        ...msg,
+        isSelf: msg.ip === localIp,
+      }));
+      setProcessedMessages(updatedMessages);
+    };
 
-  const handleDisconnect = () => {
-    setMessageView(false);
-    disconnect();
-  };
+    processMessages();
+  }, [messages]);
+
+  useEffect(() => {
+    if (flatListRef.current && processedMessages.length > 0) {
+      flatListRef.current.scrollToEnd({ animated: true });
+    }
+  }, [processedMessages, focused]);
 
   const handleSendMessage = () => {
     if (message.trim()) {
@@ -50,12 +60,44 @@ const MessageView = ({
     }
   };
 
-  const isSelf = (ip: Promise<string>) => {
-    if (ip !== deviceIp) {
-      return true;
-    } else {
-      return false;
-    }
+  const renderMessages = ({ item }: { item: processedMessages }) => {
+    return (
+      <View
+        style={[
+          styles.messageCard,
+          {
+            alignSelf: item.isSelf ? "flex-end" : "flex-start",
+            borderBottomRightRadius: item.isSelf ? 5 : 20,
+            borderBottomLeftRadius: item.isSelf ? 20 : 5,
+          },
+        ]}
+      >
+        <View
+          style={{
+            backgroundColor: Colors[colorScheme].itemBackground,
+            borderLeftWidth: item.isSelf ? 0 : 2,
+            borderRightWidth: item.isSelf ? 2 : 0,
+            borderColor: Colors[colorScheme].tint,
+            paddingHorizontal: 20,
+            paddingVertical: 10,
+            borderRadius: 20,
+          }}
+        >
+          <StyledText
+            style={{ textAlign: item.isSelf ? "right" : "left" }}
+            fontSize={14}
+            text={item.name}
+          />
+        </View>
+        <View style={{ padding: 10 }}>
+          <StyledText
+            style={{ textAlign: item.isSelf ? "right" : "left" }}
+            fontSize={17}
+            text={item.message}
+          />
+        </View>
+      </View>
+    );
   };
 
   return (
@@ -78,35 +120,14 @@ const MessageView = ({
           fontWeight="bold"
           text="Messages"
         />
-        <TouchableOpacity
-          style={styles.headerButton}
-          onPress={handleDisconnect}
-        >
-          <Icon source={icons.disConnect} filter={1} height={20} width={25} />
-        </TouchableOpacity>
       </View>
       <View style={styles.messageContainer}>
         <FlatList
-          data={messages}
-          contentContainerStyle={{ gap: 10, flex: 1 }}
-          keyExtractor={(_, index) => index.toString()}
-          renderItem={({ item, index }) => (
-            <View
-              key={index}
-              style={[
-                styles.messageCard,
-                {
-                  alignSelf: devices.find(
-                    async (device) => device.ip === (await deviceIp)
-                  )
-                    ? "flex-end"
-                    : "flex-start",
-                },
-              ]}
-            >
-              <StyledText fontSize={16} text={item.text} />
-            </View>
-          )}
+          ref={flatListRef}
+          data={processedMessages}
+          scrollEnabled
+          contentContainerStyle={{ gap: 15, padding: 15 }}
+          renderItem={renderMessages}
           ListEmptyComponent={
             <StyledText
               fontSize={16}
@@ -162,36 +183,33 @@ export default MessageView;
 const messageScreenStyles = (colorScheme: "dark" | "light") =>
   StyleSheet.create({
     main: {
-      padding: 15,
       flex: 1,
+      paddingBottom: 15,
     },
     header: {
       flexDirection: "row",
-      justifyContent: "space-between",
+      justifyContent: "center",
       alignItems: "center",
+      paddingVertical: 20,
     },
     headerButton: {
+      position: "absolute",
       padding: 10,
+      left: 10,
     },
     messageContainer: {
       flex: 1,
       borderRadius: 10,
-      padding: 10,
     },
     messageCard: {
-      padding: 22,
       backgroundColor: Colors[colorScheme].transparent,
       width: "auto",
       maxWidth: "80%",
-      borderRadius: 30,
-    },
-    messageText: {
-      fontSize: 16,
-    },
-    deviceContainer: {
-      flexDirection: "row",
-      justifyContent: "space-between",
-      alignItems: "center",
+      borderRadius: 20,
+      overflow: "hidden",
+      padding: 5,
+      borderWidth: 2,
+      borderColor: Colors[colorScheme].itemBackground,
     },
     inputContainer: {
       flexDirection: "row",
@@ -201,5 +219,6 @@ const messageScreenStyles = (colorScheme: "dark" | "light") =>
       borderRadius: 10,
       backgroundColor: Colors[colorScheme].transparent,
       borderWidth: 1,
+      marginHorizontal: 10,
     },
   });

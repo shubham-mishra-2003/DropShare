@@ -1,6 +1,6 @@
-import { Image, Text, TouchableOpacity, View } from "react-native";
-import React, { useState } from "react";
-
+import { Image, TouchableOpacity, View } from "react-native";
+import React, { useState, useCallback } from "react";
+import { useFocusEffect } from "@react-navigation/native";
 import useUsername from "../../hooks/useUsername";
 import { nearByDevicesStyles } from "../../constants/Styles";
 import { useTheme } from "../../hooks/ThemeProvider";
@@ -8,18 +8,24 @@ import Icon from "../Icon";
 import { icons, images } from "../../assets";
 import BottomSheet from "../ui/BottomSheet";
 import { Colors } from "../../constants/Colors";
-import { navigate } from "../../utils/NavigationUtil";
 import QRGenerator from "./QrGenerator";
 import QRScanner from "./QrScanner";
 import StyledText from "../ui/StyledText";
+import { navigate } from "../../utils/NavigationUtil";
 
 const DropshareConnect = () => {
   const [openConnect, setOpenConnect] = useState(false);
   const [openHostSheet, setOpenHostSheet] = useState(false);
   const [openConnectSheet, setOpenConnectSheet] = useState(false);
-  const { username } = useUsername();
+  const { username, loadUsername } = useUsername();
   const { colorScheme } = useTheme();
   const styles = nearByDevicesStyles(colorScheme);
+
+  useFocusEffect(
+    useCallback(() => {
+      loadUsername();
+    }, [loadUsername])
+  );
 
   return (
     <>

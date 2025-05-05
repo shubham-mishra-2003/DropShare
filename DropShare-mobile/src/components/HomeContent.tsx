@@ -138,6 +138,9 @@ const HomeContent: React.FC = () => {
       colors={Colors[colorScheme].linearGradientColors}
       style={styles.mainView}
     >
+      <TouchableOpacity onPress={() => navigate("connectionscreen")}>
+        <StyledText text="Connection screen" />
+      </TouchableOpacity>
       <View style={{ paddingHorizontal: 10 }}>
         <StyledText text="Files" fontWeight="bold" fontSize={55} />
       </View>

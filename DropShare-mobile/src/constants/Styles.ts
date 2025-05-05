@@ -779,3 +779,92 @@ export const ShareScreenStyles = (colorScheme: "dark" | "light") =>
       boxShadow: `0px 0px 20px ${Colors[colorScheme].tint}`,
     },
   });
+
+export const ConnectionScreenStyles = (colorScheme: "light" | "dark") =>
+  StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: Colors[colorScheme].background,
+      paddingTop: 50,
+      paddingBottom: 30,
+    },
+    mainContent: {
+      paddingHorizontal: 20,
+      justifyContent: "space-between",
+      flex: 1,
+    },
+    subtitle: {
+      marginTop: 20,
+      marginBottom: 10,
+      textAlign: "center",
+    },
+    connectionStatus: {
+      backgroundColor: Colors[colorScheme].itemBackground,
+      padding: 10,
+      borderRadius: 8,
+      marginBottom: 10,
+      alignItems: "center",
+    },
+    devicesList: {
+      flexDirection: "row",
+      justifyContent: "space-between",
+      gap: 10,
+      paddingVertical: 15,
+      paddingHorizontal: 15,
+      backgroundColor: Colors[colorScheme].transparent,
+      borderRadius: 20,
+      borderWidth: 2,
+      borderColor: Colors[colorScheme].itemBackground,
+    },
+    transferCard: {
+      backgroundColor: Colors[colorScheme].itemBackground,
+      padding: 10,
+      borderRadius: 8,
+      marginVertical: 5,
+      flexDirection: "row",
+      alignItems: "center",
+    },
+    transferInfo: {
+      flex: 1,
+      backgroundColor: Colors[colorScheme].transparent,
+      borderRadius: 20,
+      borderWidth: 2,
+      borderColor: Colors[colorScheme].itemBackground,
+      padding: 10,
+      gap: 10,
+    },
+    transferDetails: {
+      flexDirection: "row",
+      justifyContent: "space-between",
+      marginTop: 5,
+      width: "100%",
+    },
+    progressBar: {
+      marginTop: 10,
+      height: 10,
+      borderRadius: 10,
+    },
+    noData: {
+      color: Colors[colorScheme].text + "80",
+      fontSize: 14,
+      textAlign: "center",
+      marginVertical: 10,
+    },
+    messageButton: {
+      position: "absolute",
+      bottom: 85,
+      right: 10,
+      backgroundColor: Colors[colorScheme].tint,
+      borderRadius: 30,
+      padding: 12,
+      boxShadow: `0px 0px 30px ${Colors[colorScheme].background}`,
+    },
+    sendButton: {
+      padding: 15,
+      backgroundColor: Colors[colorScheme].tint,
+      borderRadius: 20,
+      alignItems: "center",
+      justifyContent: "center",
+      width: "45%",
+    },
+  });

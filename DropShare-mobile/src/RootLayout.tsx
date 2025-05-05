@@ -90,7 +90,7 @@ const RootLayout = () => {
               </Stack.Navigator>
             </NavigationContainer>
             <StatusBar
-              backgroundColor={Colors[colorScheme].transparent}
+              backgroundColor={Colors[colorScheme].background}
               barStyle={
                 colorScheme == "dark" ? "light-content" : "dark-content"
               }
