@@ -18,7 +18,6 @@ interface NetworkContextType {
   socket: TCPSocket.Server | TCPSocket.Socket | null;
   messages: message[];
   receivedFiles: string[];
-  sentFiles: { id: number; name: string; size: number }[];
   isHostConnected: boolean;
   isClientConnected: boolean;
   isHost: boolean;
@@ -46,9 +45,6 @@ export const NetworkProvider: React.FC<{ children: React.ReactNode }> = ({
   >(null);
   const [messages, setMessages] = useState<message[]>([]);
   const [receivedFiles, setReceivedFiles] = useState<string[]>([]);
-  const [sentFiles, setSentFiles] = useState<
-    { id: number; name: string; size: number }[]
-  >([]);
   const [isHostConnected, setIsHostConnected] = useState(false);
   const [isClientConnected, setIsClientConnected] = useState(false);
   const [isHost, setIsHost] = useState(false);
@@ -150,16 +146,6 @@ export const NetworkProvider: React.FC<{ children: React.ReactNode }> = ({
         connectedSockets,
         setTransferProgress
       );
-      files.forEach((file, index) => {
-        setSentFiles((prev) => [
-          ...prev,
-          {
-            id: Date.now() + index,
-            name: file.filePath.split("/").pop() || "unknown",
-            size: 0, // Size could be fetched if needed
-          },
-        ]);
-      });
       Logger.toast(`Sent ${files.length} file(s)`, "info");
     } catch (error) {
       Logger.error("Failed to send files", error);
@@ -256,7 +242,6 @@ export const NetworkProvider: React.FC<{ children: React.ReactNode }> = ({
         socket,
         messages,
         receivedFiles,
-        sentFiles,
         isHostConnected,
         isClientConnected,
         isHost,

@@ -37,7 +37,7 @@ const scanDirectoryRecursive = async (
     for (const file of files) {
       // Skip hidden files/folders
       if (file.name.startsWith(".")) {
-        console.log(`Skipping hidden item: ${file.path}`);
+        // console.log(`Skipping hidden item: ${file.path}`);
         continue;
       }
 

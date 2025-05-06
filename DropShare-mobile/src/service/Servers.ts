@@ -365,6 +365,7 @@
 //   };
 // };
 
+// working before encryption
 import dgram from "react-native-udp";
 import {
   getLocalIPAddress,

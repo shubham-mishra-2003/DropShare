@@ -169,7 +169,7 @@ const ConnectionScreen: React.FC = () => {
       <View style={styles.mainContent}>
         <BreakerText
           fontSize={24}
-          text={isHost ? "Connected Clients :" : "Connected to :"}
+          text={isHost ? "Connected Clients :" : "Connected to Host:"}
         />
         <View>
           <FlatList

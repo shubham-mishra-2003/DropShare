@@ -62,6 +62,7 @@
 //   }
 // }
 
+// working before encryption
 import { Permission } from "react-native";
 
 import { Buffer } from "buffer";
@@ -77,7 +78,7 @@ declare global {
     name: string;
     message: string;
   }
-  
+
   interface TransferProgress {
     fileId: string;
     fileName: string;
