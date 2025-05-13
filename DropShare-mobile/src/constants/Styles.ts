@@ -785,7 +785,7 @@ export const ConnectionScreenStyles = (colorScheme: "light" | "dark") =>
     container: {
       flex: 1,
       backgroundColor: Colors[colorScheme].background,
-      paddingTop: 50,
+      paddingTop: 20,
       paddingBottom: 30,
     },
     mainContent: {
@@ -809,8 +809,7 @@ export const ConnectionScreenStyles = (colorScheme: "light" | "dark") =>
       flexDirection: "row",
       justifyContent: "space-between",
       gap: 10,
-      paddingVertical: 15,
-      paddingHorizontal: 15,
+      padding: 10,
       backgroundColor: Colors[colorScheme].transparent,
       borderRadius: 20,
       borderWidth: 2,

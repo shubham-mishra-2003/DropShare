@@ -1,3 +1,5 @@
+import { Buffer } from "buffer";
+
 declare module "react-native-crypto" {
   export function createHash(algorithm: string): {
     update(data: string | Buffer): any;

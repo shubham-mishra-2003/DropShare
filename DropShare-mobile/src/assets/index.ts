@@ -35,6 +35,8 @@ import receivedIcon from "./icons/arrow-big-down-dash.png";
 import messageIcon from "./icons/message-circle.png";
 import zipIcon from "./icons/zip_folder.png";
 import sendIcon from "./icons/send.png";
+import PauseIcon from "./icons/pause.png";
+import ResumeIcon from "./icons/play.png";
 
 const icons = {
   sun: sunIcon,
@@ -72,6 +74,8 @@ const icons = {
   message: messageIcon,
   zip: zipIcon,
   send: sendIcon,
+  pause: PauseIcon,
+  resume: ResumeIcon,
 };
 
 const images = {

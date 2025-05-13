@@ -22,6 +22,7 @@ import { NetworkProvider } from "./service/NetworkProvider";
 import { startIndexing } from "./db/dropshareDb";
 import { Colors } from "./constants/Colors";
 import ConnectionScreen from "./pages/ConnectionScreen";
+import { ChunkStorage } from "./service/ChunkStorage";
 
 enableScreens();
 
@@ -34,6 +35,7 @@ const RootLayout = () => {
 
   useEffect(() => {
     startIndexing(false);
+    ChunkStorage.initialize();
   }, []);
 
   const toggleSidebar = () => {

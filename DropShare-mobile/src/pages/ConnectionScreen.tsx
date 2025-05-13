@@ -31,6 +31,8 @@ const ConnectionScreen: React.FC = () => {
     isHostConnected,
     isClientConnected,
     stopHosting,
+    pauseTransfer,
+    resumeTransfer,
   } = useNetwork();
   const [selectToSend, setSelectToSend] = useState<RNFS.ReadDirItem[]>([]);
   const [messageView, setMessageView] = useState(false);
@@ -81,6 +83,7 @@ const ConnectionScreen: React.FC = () => {
   //     fileSize: 10 * 1024,
   //     speed: 1024,
   //     status: "Sending",
+  //     isPaused: true,
   //   },
   //   {
   //     fileId: "2",
@@ -89,14 +92,16 @@ const ConnectionScreen: React.FC = () => {
   //     fileSize: 12.5 * 1024,
   //     speed: 512,
   //     status: "Receiving",
+  //     isPaused: true,
   //   },
   //   {
   //     fileId: "3",
   //     fileName: "video.mp4",
   //     transferredBytes: 5 * 1024,
   //     fileSize: 10 * 1024,
-  //     speed: 2048,
+  //     speed: 20480 * 20,
   //     status: "Sending",
+  //     isPaused: false,
   //   },
   // ]);
 
@@ -122,21 +127,47 @@ const ConnectionScreen: React.FC = () => {
 
     return (
       <View style={styles.transferInfo}>
-        <StyledText
-          fontSize={16}
-          fontWeight="bold"
-          isEllipsis
-          style={{ width: "90%" }}
+        <View
+          style={{
+            flexDirection: "row",
+            padding: 5,
+            justifyContent: "space-between",
+            alignItems: "center",
+          }}
         >
-          {item.fileName}
-        </StyledText>
+          <StyledText
+            fontSize={16}
+            fontWeight="bold"
+            isEllipsis
+            style={{ width: "90%" }}
+          >
+            {item.fileName}
+          </StyledText>
+          {item.status != "Completed" && (
+            <TouchableOpacity
+              style={{ padding: 2 }}
+              onPress={() =>
+                item.isPaused
+                  ? resumeTransfer(item.fileId)
+                  : pauseTransfer(item.fileId)
+              }
+            >
+              <Icon
+                source={item.isPaused ? icons.resume : icons.pause}
+                filter={1}
+                height={22}
+                width={20}
+              />
+            </TouchableOpacity>
+          )}
+        </View>
         <View style={styles.transferDetails}>
           <StyledText fontSize={12} fontWeight="bold" isEllipsis>
             {item.status} • {formatFileSize(item.transferredBytes)} /{" "}
             {formatFileSize(item.fileSize)}
           </StyledText>
           <StyledText fontSize={12} fontWeight="bold">
-            Speed: {formatFileSize(item.speed)}/s
+            Speed: {formatFileSize(item.speed * 20)}/s
           </StyledText>
         </View>
         {item.status != "Completed" && (
@@ -168,7 +199,7 @@ const ConnectionScreen: React.FC = () => {
       />
       <View style={styles.mainContent}>
         <BreakerText
-          fontSize={24}
+          fontSize={22}
           text={isHost ? "Connected Clients :" : "Connected to Host:"}
         />
         <View>
@@ -185,7 +216,7 @@ const ConnectionScreen: React.FC = () => {
             renderItem={(device) => (
               <View style={styles.devicesList}>
                 <StyledText
-                  fontSize={18}
+                  fontSize={16}
                   fontWeight="bold"
                   isEllipsis
                   text={device.item.name}

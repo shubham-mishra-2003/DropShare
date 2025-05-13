@@ -171,7 +171,12 @@ const FilesList: React.FC = () => {
           <View style={styles.filesView}>
             {files.length === 0 ? (
               <StyledText
-                style={{ color: Colors[colorScheme].text, textAlign: "center" }}
+                fontSize={20}
+                style={{
+                  color: Colors[colorScheme].text,
+                  textAlign: "center",
+                  width: "100%",
+                }}
               >
                 No files found
               </StyledText>
