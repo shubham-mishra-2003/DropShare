@@ -161,7 +161,7 @@ export class ChunkStorage {
       );
 
       for (let i = 0; i < results.rows.length; i++) {
-        const { fileId, tempPath } = results.rows.item(i);
+        const { tempPath } = results.rows.item(i);
         if (await RNFS.exists(tempPath)) {
           await RNFS.unlink(tempPath);
           Logger.info(`Deleted expired temp file ${tempPath}`);

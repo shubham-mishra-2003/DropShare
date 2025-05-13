@@ -107,7 +107,7 @@ const SettingsPage = () => {
             <TouchableOpacity
               style={[styles.submitButton, isSubmitting && { opacity: 0.6 }]}
               onPress={handleSubmit}
-              disabled={isSubmitting} // Disable button while submitting
+              disabled={isSubmitting}
             >
               <StyledText
                 text={isSubmitting ? "Saving..." : "Submit"}
@@ -144,6 +144,23 @@ const SettingsPage = () => {
             }}
           >
             <StyledText text="Safe Folder" fontWeight="bold" fontSize={22} />
+          </TouchableOpacity>
+          <TouchableOpacity
+            onPress={() => {
+              Toast("Settings reseted to default");
+              Vibration.vibrate(50);
+            }}
+            style={{
+              paddingHorizontal: 20,
+              paddingVertical: 15,
+              borderRadius: 50,
+              justifyContent: "center",
+              backgroundColor: Colors[colorScheme].transparent,
+              borderColor: colorScheme === "light" ? "#99a6bd" : "#566173",
+              borderWidth: 1,
+            }}
+          >
+            <StyledText text="Reset Settings" fontWeight="bold" fontSize={22} />
           </TouchableOpacity>
         </View>
       </ScrollView>

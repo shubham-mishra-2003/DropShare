@@ -271,7 +271,6 @@
 //   return context;
 // };
 
-// // pause and resume mechanism
 import React, {
   createContext,
   useContext,
@@ -308,6 +307,7 @@ interface NetworkContextType {
   transferProgress: TransferProgress[];
   pauseTransfer: (fileId: string) => void;
   resumeTransfer: (fileId: string) => void;
+  cancelTransfer: (fileId: string) => void;
 }
 
 const NetworkContext = createContext<NetworkContextType | undefined>(undefined);
@@ -333,9 +333,13 @@ export const NetworkProvider: React.FC<{ children: React.ReactNode }> = ({
     loadUsername();
   }, [loadUsername]);
 
-  const { sendMessage, sendFiles, pauseTransfer, resumeTransfer } = Sharing(
-    isHost ? "host" : "client"
-  );
+  const {
+    sendMessage,
+    sendFiles,
+    pauseTransfer,
+    resumeTransfer,
+    cancelTransfer,
+  } = Sharing(isHost ? "host" : "client");
   const { startHostServer, stopHostServer, kickClient, connectedSockets } =
     HostServer();
   const {
@@ -451,6 +455,20 @@ export const NetworkProvider: React.FC<{ children: React.ReactNode }> = ({
     }
   };
 
+  const cancelTransferHandler = async (fileId: string) => {
+    try {
+      await cancelTransfer(
+        fileId,
+        isHost ? null : (socket as TCPSocket.Socket),
+        setTransferProgress
+      );
+      Logger.toast(`Cancelled transfer ${fileId}`, "info");
+    } catch (error) {
+      Logger.error(`Failed to cancel transfer ${fileId}`, error);
+      Logger.toast("Failed to cancel transfer", "error");
+    }
+  };
+
   const disconnect = () => {
     if (isHost) {
       stopHosting();
@@ -556,6 +574,7 @@ export const NetworkProvider: React.FC<{ children: React.ReactNode }> = ({
         transferProgress,
         pauseTransfer: pauseTransferHandler,
         resumeTransfer: resumeTransferHandler,
+        cancelTransfer: cancelTransferHandler,
       }}
     >
       {children}

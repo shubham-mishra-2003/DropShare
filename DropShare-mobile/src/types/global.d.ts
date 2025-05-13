@@ -12,51 +12,6 @@ declare global {
     message: string;
   }
 
-  // interface TransferProgress {
-  //   fileId: string;
-  //   fileName: string;
-  //   transferredBytes: number;
-  //   fileSize: number;
-  //   speed: number;
-  //   status:
-  //     | "Sending"
-  //     | "Receiving"
-  //     | "Completed"
-  //     | "Failed"
-  //     | "Encrypting"
-  //     | "Decrypting";
-  //   error?: string;
-  // }
-
-  // interface FileTransfer {
-  //   fileId: string;
-  //   fileName: string;
-  //   fileSize: number;
-  //   deviceName: string;
-  //   senderIp: string;
-  //   chunks: Buffer[];
-  //   receivedBytes: number;
-  //   startTime: number;
-  //   totalChunks: number;
-  //   chunkSize: number;
-  //   totalSize: number;
-  //   chunkHashes: string[];
-  //   status:
-  //     | "Sending"
-  //     | "Receiving"
-  //     | "Completed"
-  //     | "Failed"
-  //     | "Encrypting"
-  //     | "Decrypting";
-  //   progress: number;
-  //   endTime?: number;
-  //   error?: string;
-  //   aesKey?: string;
-  //   iv?: string;
-  //   lastChunkIndex: number;
-  //   speedWindow: { bytes: number; timestamp: number }[];
-  // }
-
   interface TransferProgress {
     fileId: string;
     fileName: string;
@@ -70,7 +25,8 @@ declare global {
       | "Failed"
       | "Encrypting"
       | "Decrypting"
-      | "Paused";
+      | "Paused"
+      | "Cancelled";
     error?: string;
     isPaused: boolean;
   }
@@ -95,7 +51,8 @@ declare global {
       | "Failed"
       | "Encrypting"
       | "Decrypting"
-      | "Paused";
+      | "Paused"
+      | "Cancelled";
     progress: number;
     endTime?: number;
     error?: string;
@@ -106,7 +63,6 @@ declare global {
     isPaused: boolean;
     pauseResolve?: () => void;
   }
-
   interface UdpSocket {
     bind(port: number): void;
     on(event: "listening", listener: () => void): void;

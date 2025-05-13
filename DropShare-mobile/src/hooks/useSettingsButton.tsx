@@ -44,7 +44,16 @@ const useSettingsButton = () => {
 
   const getSetting = (settingKey: keyof Settings) => settings[settingKey];
 
-  return { settings, toggleSetting, getSetting };
+  const resetSettings = async () => {
+    try {
+      await AsyncStorage.removeItem("appSettings");
+      setSettings(defaultSettings);
+    } catch (error) {
+      console.error("Error resetting settings:", error);
+    }
+  };
+
+  return { settings, toggleSetting, getSetting, resetSettings };
 };
 
 export default useSettingsButton;

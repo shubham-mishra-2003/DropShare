@@ -33,6 +33,7 @@ const ConnectionScreen: React.FC = () => {
     stopHosting,
     pauseTransfer,
     resumeTransfer,
+    cancelTransfer,
   } = useNetwork();
   const [selectToSend, setSelectToSend] = useState<RNFS.ReadDirItem[]>([]);
   const [messageView, setMessageView] = useState(false);
@@ -47,6 +48,7 @@ const ConnectionScreen: React.FC = () => {
   };
 
   const BackClick = () => {
+    disconnect();
     stopClient();
     resetAndNavigate("home");
     return true;
@@ -103,6 +105,15 @@ const ConnectionScreen: React.FC = () => {
   //     status: "Sending",
   //     isPaused: false,
   //   },
+  //   {
+  //     fileId: "4",
+  //     fileName: "video.mp4",
+  //     transferredBytes: 5 * 1024,
+  //     fileSize: 10 * 1024,
+  //     speed: 20480 * 20,
+  //     status: "Cancelled",
+  //     isPaused: false,
+  //   },
   // ]);
 
   useEffect(() => {
@@ -139,38 +150,46 @@ const ConnectionScreen: React.FC = () => {
             fontSize={16}
             fontWeight="bold"
             isEllipsis
-            style={{ width: "90%" }}
+            style={{ width: "60%" }}
           >
             {item.fileName}
           </StyledText>
-          {item.status != "Completed" && (
-            <TouchableOpacity
-              style={{ padding: 2 }}
-              onPress={() =>
-                item.isPaused
-                  ? resumeTransfer(item.fileId)
-                  : pauseTransfer(item.fileId)
-              }
-            >
-              <Icon
-                source={item.isPaused ? icons.resume : icons.pause}
-                filter={1}
-                height={22}
-                width={20}
-              />
-            </TouchableOpacity>
+          {item.status != "Completed" && item.status != "Cancelled" && (
+            <View style={{ flexDirection: "row", gap: 5 }}>
+              <TouchableOpacity
+                style={{ padding: 2 }}
+                onPress={() =>
+                  item.isPaused
+                    ? resumeTransfer(item.fileId)
+                    : pauseTransfer(item.fileId)
+                }
+              >
+                <Icon
+                  source={item.isPaused ? icons.resume : icons.pause}
+                  filter={1}
+                  height={22}
+                  width={20}
+                />
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={{ padding: 2 }}
+                onPress={() => cancelTransfer(item.fileId)}
+              >
+                <Icon source={icons.cross} filter={1} height={22} width={20} />
+              </TouchableOpacity>
+            </View>
           )}
         </View>
         <View style={styles.transferDetails}>
           <StyledText fontSize={12} fontWeight="bold" isEllipsis>
-            {item.status} • {formatFileSize(item.transferredBytes)} /{" "}
+            {item.status} • {formatFileSize(item.transferredBytes)} / {""}
             {formatFileSize(item.fileSize)}
           </StyledText>
           <StyledText fontSize={12} fontWeight="bold">
             Speed: {formatFileSize(item.speed * 20)}/s
           </StyledText>
         </View>
-        {item.status != "Completed" && (
+        {item.status != "Completed" && item.status != "Cancelled" && (
           <ProgressBar
             styleAttr="Horizontal"
             animating={true}

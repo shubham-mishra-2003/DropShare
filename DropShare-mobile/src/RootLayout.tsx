@@ -36,6 +36,7 @@ const RootLayout = () => {
   useEffect(() => {
     startIndexing(false);
     ChunkStorage.initialize();
+    ChunkStorage.cleanupExpired();
   }, []);
 
   const toggleSidebar = () => {
