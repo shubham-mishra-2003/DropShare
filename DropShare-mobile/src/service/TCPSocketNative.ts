@@ -1,12 +1,24 @@
-import { NativeModules, NativeEventEmitter, Platform } from "react-native";
+import { NativeModules, NativeEventEmitter } from "react-native";
 import { Buffer } from "buffer";
 import EventEmitter from "eventemitter3";
 
-const { TCPSocket } = NativeModules;
+const { DropShareTCPSocket } = NativeModules;
 
-if (!TCPSocket) {
-  throw new Error("TCPSocket native module is not available");
+if (!DropShareTCPSocket) {
+  throw new Error("DropShareTCPSocket native module is not available");
 }
+
+type BufferEncoding =
+  | "ascii"
+  | "utf8"
+  | "utf-8"
+  | "utf16le"
+  | "ucs2"
+  | "ucs-2"
+  | "base64"
+  | "latin1"
+  | "binary"
+  | "hex";
 
 type SocketOptions = {
   host?: string;
@@ -17,12 +29,16 @@ type SocketOptions = {
   timeout?: number;
   keepAlive?: boolean;
   noDelay?: boolean;
+  initialDelay?: number;
 };
 
 type ServerOptions = {
-  port: number;
+  port?: number; // Made optional to allow {}
   host?: string;
   reuseAddress?: boolean;
+  noDelay?: boolean;
+  keepAlive?: boolean;
+  keepAliveInitialDelay?: number;
 };
 
 type ConnectionInfo = {
@@ -38,9 +54,17 @@ export class Socket extends EventEmitter {
   private eventEmitter: NativeEventEmitter;
   private destroyed: boolean = false;
   private paused: boolean = false;
+  private connecting: boolean = false;
+  private pending: boolean = true;
+  private encoding: BufferEncoding | null = null;
+  private writeBufferSize: number = 0;
+  public bytesRead: number = 0; // Changed to public, removed getter
+  public bytesWritten: number = 0; // Changed to public, removed getter
+  private msgId: number = 0;
   private initialized: Promise<void>;
-
-  // Properties to mimic react-native-tcp-socket
+  public readableHighWaterMark: number = 512 * 1024;
+  public writableHighWaterMark: number = 512 * 1024;
+  public writableNeedDrain: boolean = false;
   public localAddress: string | null = null;
   public localPort: number | null = null;
   public remoteAddress: string | null = null;
@@ -49,15 +73,21 @@ export class Socket extends EventEmitter {
 
   constructor() {
     super();
-    this.eventEmitter = new NativeEventEmitter(); // Changed to use default DeviceEventEmitter
+    this.eventEmitter = new NativeEventEmitter(DropShareTCPSocket);
     this.initialized = this.initializeSocket();
   }
 
   private async initializeSocket() {
     try {
-      this.socketId = await TCPSocket.createSocket();
-      await this.setBufferSize(64 * 1024); // Set default buffer size to 64KB
+      this.socketId = await new Promise((resolve, reject) => {
+        DropShareTCPSocket.createSocket((error: any, socketId: string) => {
+          if (error) reject(error);
+          else resolve(socketId);
+        });
+      });
+      await this.setBufferSize(512 * 1024);
       this.setupEventListeners();
+      this.pending = false;
     } catch (error) {
       this.emit("error", error);
       throw error;
@@ -72,6 +102,7 @@ export class Socket extends EventEmitter {
         "connect",
         (params: { id: string; connection: ConnectionInfo }) => {
           if (params.id === this.socketId) {
+            this.connecting = false;
             this.localAddress = params.connection.localAddress;
             this.localPort = params.connection.localPort;
             this.remoteAddress = params.connection.remoteAddress;
@@ -83,13 +114,35 @@ export class Socket extends EventEmitter {
       ),
       this.eventEmitter.addListener(
         "data",
-        (params: { id: string; data: number[] }) => {
+        (params: { id: string; data: string }) => {
           if (params.id === this.socketId && !this.paused) {
-            const buffer = Buffer.from(params.data);
-            this.emit("data", buffer);
+            const bufferData = Buffer.from(params.data, "base64");
+            this.bytesRead += bufferData.length;
+            const finalData = this.encoding
+              ? bufferData.toString(this.encoding)
+              : bufferData;
+            this.emit("data", finalData);
           }
         }
       ),
+      this.eventEmitter.addListener(
+        "written",
+        (params: { id: string; msgId: number }) => {
+          if (params.id === this.socketId) {
+            this.writeBufferSize -= this.writableHighWaterMark;
+            if (this.writableNeedDrain && this.writeBufferSize <= 0) {
+              this.writableNeedDrain = false;
+              this.emit("drain");
+            }
+          }
+        }
+      ),
+      this.eventEmitter.addListener("drain", (params: { id: string }) => {
+        if (params.id === this.socketId) {
+          this.writableNeedDrain = false;
+          this.emit("drain");
+        }
+      }),
       this.eventEmitter.addListener(
         "close",
         (params: { id: string; hadError: boolean }) => {
@@ -116,149 +169,235 @@ export class Socket extends EventEmitter {
     });
   }
 
+  get readyState(): string {
+    if (this.destroyed) return "closed";
+    if (this.connecting) return "opening";
+    return "open";
+  }
+
   async setBufferSize(size: number): Promise<void> {
     if (this.destroyed || !this.socketId) {
       throw new Error("Socket is closed or not initialized");
     }
-    return TCPSocket.setBufferSize(size);
+    return new Promise((resolve, reject) => {
+      DropShareTCPSocket.setBufferSize(size, (error: any, result: string) => {
+        if (error) reject(error);
+        else resolve();
+      });
+    });
   }
 
-  async connect(options: SocketOptions): Promise<this> {
-    await this.initialized; // Wait for socket initialization
-    if (!this.socketId) {
-      this.emit("error", new Error("Socket not initialized"));
-      return this;
-    }
-
-    const connectOptions = {
-      host: options.host || "127.0.0.1",
-      port: options.port || 0,
-      localAddress: options.localAddress,
-      localPort: options.localPort || 0,
-    };
-
-    try {
-      await TCPSocket.socketConnect(this.socketId, connectOptions);
-      // Apply configuration options if provided
-      const configOptions: SocketOptions = {};
-      if (options.timeout !== undefined)
-        configOptions.timeout = options.timeout;
-      if (options.keepAlive !== undefined)
-        configOptions.keepAlive = options.keepAlive;
-      if (options.noDelay !== undefined)
-        configOptions.noDelay = options.noDelay;
-
-      if (Object.keys(configOptions).length > 0) {
-        await TCPSocket.configureSocket(this.socketId, configOptions);
-      }
-    } catch (error) {
-      this.emit("error", error);
-    }
-
+  connect(options: SocketOptions, callback?: () => void): this {
+    this.initialized
+      .then(() => {
+        if (!this.socketId) {
+          this.emit("error", new Error("Socket not initialized"));
+          return;
+        }
+        this.connecting = true;
+        this.pending = true;
+        const connectOptions = {
+          host: options.host || "127.0.0.1",
+          port: options.port || 0,
+          localAddress: options.localAddress,
+          localPort: options.localPort || 0,
+          reuseAddress: options.reuseAddress,
+        };
+        DropShareTCPSocket.connect(
+          this.socketId,
+          connectOptions.host,
+          connectOptions.port,
+          connectOptions,
+          (error: any, result: string) => {
+            if (error) {
+              this.emit("error", error);
+            } else {
+              this.pending = false;
+              if (callback) callback();
+              const configOptions: SocketOptions = {};
+              if (options.timeout !== undefined)
+                configOptions.timeout = options.timeout;
+              if (options.keepAlive !== undefined)
+                configOptions.keepAlive = options.keepAlive;
+              if (options.noDelay !== undefined)
+                configOptions.noDelay = options.noDelay;
+              if (options.initialDelay !== undefined)
+                configOptions.initialDelay = options.initialDelay;
+              if (Object.keys(configOptions).length > 0) {
+                DropShareTCPSocket.configureSocket(
+                  this.socketId,
+                  configOptions,
+                  (err: any) => {
+                    if (err) this.emit("error", err);
+                  }
+                );
+              }
+            }
+          }
+        );
+      })
+      .catch((error) => {
+        this.emit("error", error);
+      });
+    if (callback) this.once("connect", callback);
     return this;
   }
 
-  write(data: Buffer | string): boolean {
+  write(
+    data: Buffer | string,
+    encoding?: BufferEncoding,
+    callback?: (err?: Error) => void
+  ): boolean {
     if (this.destroyed || !this.socketId) {
-      this.emit("error", new Error("Socket is closed or not initialized"));
+      const error = new Error("Socket is closed or not initialized");
+      if (callback) callback(error);
+      this.emit("error", error);
       return false;
     }
 
-    const byteArray = Buffer.isBuffer(data) ? data : Buffer.from(data);
-    const intArray = Array.from(byteArray);
+    const buffer =
+      typeof data === "string" ? Buffer.from(data, encoding) : data;
+    this.bytesWritten += buffer.length;
+    this.writeBufferSize += buffer.length;
+    const base64Data = buffer.toString("base64");
+    const currentMsgId = this.msgId++;
+    DropShareTCPSocket.write(
+      this.socketId,
+      base64Data,
+      currentMsgId,
+      (error: any, result: string) => {
+        if (error) {
+          if (callback) callback(error);
+          this.emit("error", error);
+        } else {
+          if (callback) callback();
+        }
+      }
+    );
+    const ok = this.writeBufferSize < this.writableHighWaterMark;
+    if (!ok) this.writableNeedDrain = true;
+    return ok;
+  }
 
-    TCPSocket.socketWrite(this.socketId, intArray).catch((error: any) => {
-      this.emit("error", error);
+  setEncoding(encoding: BufferEncoding): this {
+    this.encoding = encoding;
+    return this;
+  }
+
+  address(): { port: number; family: string; address: string } | {} {
+    if (!this.localAddress) return {};
+    return {
+      port: this.localPort || 0,
+      family: this.remoteFamily || "IPv4",
+      address: this.localAddress,
+    };
+  }
+
+  end(data?: Buffer | string, encoding?: BufferEncoding): this {
+    if (this.destroyed || !this.socketId) return this;
+
+    if (data) {
+      this.write(data, encoding, () => {
+        DropShareTCPSocket.end(this.socketId, (error: any) => {
+          if (error) this.emit("error", error);
+        });
+      });
+      return this;
+    }
+
+    DropShareTCPSocket.end(this.socketId, (error: any) => {
+      if (error) this.emit("error", error);
     });
-
-    return true;
-  }
-
-  async end(): Promise<this> {
-    if (this.destroyed || !this.socketId) return this;
-
-    try {
-      await TCPSocket.socketEnd(this.socketId);
-    } catch (error) {
-      this.emit("error", error);
-    }
-
     return this;
   }
 
-  async destroy(): Promise<this> {
+  destroy(): this {
     if (this.destroyed || !this.socketId) return this;
 
-    try {
-      await TCPSocket.socketDestroy(this.socketId);
-      this.destroyed = true;
-      this.socketId = null;
-    } catch (error) {
-      this.emit("error", error);
-    }
-
+    DropShareTCPSocket.destroy(this.socketId, (error: any) => {
+      if (error) this.emit("error", error);
+      else {
+        this.destroyed = true;
+        this.socketId = null;
+      }
+    });
     return this;
   }
 
-  async pause(): Promise<this> {
+  pause(): this {
     if (this.destroyed || !this.socketId) return this;
 
-    try {
-      await TCPSocket.socketPause(this.socketId);
-      this.paused = true;
-    } catch (error) {
-      this.emit("error", error);
-    }
-
+    DropShareTCPSocket.pause(this.socketId, (error: any) => {
+      if (error) this.emit("error", error);
+      else {
+        this.paused = true;
+        this.emit("pause");
+      }
+    });
     return this;
   }
 
-  async resume(): Promise<this> {
+  resume(): this {
     if (this.destroyed || !this.socketId) return this;
 
-    try {
-      await TCPSocket.socketResume(this.socketId);
-      this.paused = false;
-    } catch (error) {
-      this.emit("error", error);
-    }
-
+    DropShareTCPSocket.resume(this.socketId, (error: any) => {
+      if (error) this.emit("error", error);
+      else {
+        this.paused = false;
+        this.emit("resume");
+      }
+    });
     return this;
   }
 
-  async setTimeout(timeout: number): Promise<this> {
+  setTimeout(timeout: number, callback?: () => void): this {
     if (this.destroyed || !this.socketId) return this;
 
-    try {
-      await TCPSocket.configureSocket(this.socketId, { timeout });
-    } catch (error) {
-      this.emit("error", error);
-    }
-
+    DropShareTCPSocket.configureSocket(
+      this.socketId,
+      { timeout },
+      (error: any) => {
+        if (error) this.emit("error", error);
+        else if (callback) this.once("timeout", callback);
+      }
+    );
     return this;
   }
 
-  async setKeepAlive(enable: boolean): Promise<this> {
+  setKeepAlive(enable: boolean, initialDelay: number = 0): this {
     if (this.destroyed || !this.socketId) return this;
 
-    try {
-      await TCPSocket.configureSocket(this.socketId, { keepAlive: enable });
-    } catch (error) {
-      this.emit("error", error);
-    }
-
+    DropShareTCPSocket.setKeepAlive(
+      this.socketId,
+      enable,
+      initialDelay,
+      (error: any) => {
+        if (error) this.emit("error", error);
+      }
+    );
     return this;
   }
 
-  async setNoDelay(noDelay: boolean): Promise<this> {
+  setNoDelay(noDelay: boolean): this {
     if (this.destroyed || !this.socketId) return this;
 
-    try {
-      await TCPSocket.configureSocket(this.socketId, { noDelay });
-    } catch (error) {
-      this.emit("error", error);
-    }
+    DropShareTCPSocket.setNoDelay(this.socketId, noDelay, (error: any) => {
+      if (error) this.emit("error", error);
+    });
+    return this;
+  }
 
+  ref(): this {
+    console.warn(
+      "react-native-tcp-socket: Socket.ref() method will have no effect."
+    );
+    return this;
+  }
+
+  unref(): this {
+    console.warn(
+      "react-native-tcp-socket: Socket.unref() method will have no effect."
+    );
     return this;
   }
 }
@@ -267,18 +406,34 @@ export class Server extends EventEmitter {
   private serverId: string | null = null;
   private eventEmitter: NativeEventEmitter;
   private closed: boolean = false;
+  private listening: boolean = false;
   private connections: Map<string, Socket> = new Map();
   private initialized: Promise<void>;
+  private serverOptions: ServerOptions = {}; // Now compatible with optional port
 
-  constructor() {
+  constructor(
+    options?: ServerOptions | ((socket: Socket) => void),
+    connectionCallback?: (socket: Socket) => void
+  ) {
     super();
-    this.eventEmitter = new NativeEventEmitter(); // Changed to use default DeviceEventEmitter
+    this.eventEmitter = new NativeEventEmitter(DropShareTCPSocket);
+    if (typeof options === "function") {
+      this.on("connection", options);
+    } else if (options) {
+      this.serverOptions = options;
+      if (connectionCallback) this.on("connection", connectionCallback);
+    }
     this.initialized = this.initializeServer();
   }
 
   private async initializeServer() {
     try {
-      this.serverId = await TCPSocket.createServer();
+      this.serverId = await new Promise((resolve, reject) => {
+        DropShareTCPSocket.createServer((error: any, serverId: string) => {
+          if (error) reject(error);
+          else resolve(serverId);
+        });
+      });
       this.setupEventListeners();
     } catch (error) {
       this.emit("error", error);
@@ -294,6 +449,7 @@ export class Server extends EventEmitter {
         "listening",
         (params: { id: string; connection: ConnectionInfo }) => {
           if (params.id === this.serverId) {
+            this.listening = true;
             this.emit("listening");
           }
         }
@@ -306,9 +462,9 @@ export class Server extends EventEmitter {
         }) => {
           if (params.id === this.serverId) {
             const clientSocket = new Socket();
-            // @ts-ignore: Private access to set socketId
+            // @ts-ignore
             clientSocket.socketId = params.info.id;
-            // @ts-ignore: Private access to set properties
+            // @ts-ignore
             clientSocket.localAddress = params.info.connection.localAddress;
             // @ts-ignore
             clientSocket.localPort = params.info.connection.localPort;
@@ -319,11 +475,24 @@ export class Server extends EventEmitter {
             // @ts-ignore
             clientSocket.remoteFamily = params.info.connection.remoteFamily;
 
+            if (this.serverOptions.noDelay !== undefined) {
+              clientSocket.setNoDelay(this.serverOptions.noDelay);
+            }
+            if (this.serverOptions.keepAlive !== undefined) {
+              clientSocket.setKeepAlive(
+                this.serverOptions.keepAlive,
+                this.serverOptions.keepAliveInitialDelay || 0
+              );
+            }
+
             this.connections.set(params.info.id, clientSocket);
             this.emit("connection", clientSocket);
 
             clientSocket.on("close", () => {
               this.connections.delete(params.info.id);
+              if (!this.listening && this.connections.size === 0) {
+                this.emit("close");
+              }
             });
           }
         }
@@ -331,6 +500,7 @@ export class Server extends EventEmitter {
       this.eventEmitter.addListener("close", (params: { id: string }) => {
         if (params.id === this.serverId) {
           this.closed = true;
+          this.listening = false;
           this.emit("close");
           this.removeAllListeners();
         }
@@ -351,52 +521,108 @@ export class Server extends EventEmitter {
     });
   }
 
-  async listen(options: ServerOptions, callback?: () => void): Promise<this> {
-    await this.initialized; // Wait for server initialization
-    if (!this.serverId) {
-      this.emit("error", new Error("Server not initialized"));
-      return this;
-    }
+  listen(
+    options: ServerOptions | number,
+    callbackOrHost?: string | (() => void),
+    callback?: () => void
+  ): this {
+    this.initialized
+      .then(() => {
+        if (!this.serverId) {
+          this.emit("error", new Error("Server not initialized"));
+          return;
+        }
+        if (this.listening) {
+          this.emit("error", new Error("ERR_SERVER_ALREADY_LISTEN"));
+          return;
+        }
 
-    const listenOptions = {
-      port: options.port || 0,
-      host: options.host || "0.0.0.0",
-      reuseAddress:
-        options.reuseAddress !== undefined ? options.reuseAddress : true,
-    };
+        let listenOptions: ServerOptions;
+        let cb: (() => void) | undefined;
 
-    try {
-      await TCPSocket.serverListen(this.serverId, listenOptions);
-      if (callback) callback();
-    } catch (error) {
-      this.emit("error", error);
-    }
+        if (typeof options === "number") {
+          listenOptions = { port: options, host: "0.0.0.0" };
+          if (typeof callbackOrHost === "string") {
+            listenOptions.host = callbackOrHost;
+            cb = callback;
+          } else if (typeof callbackOrHost === "function") {
+            cb = callbackOrHost;
+          }
+        } else {
+          listenOptions = {
+            port: options.port || 0,
+            host: options.host || "0.0.0.0",
+            reuseAddress:
+              options.reuseAddress !== undefined ? options.reuseAddress : true,
+          };
+          if (typeof callbackOrHost === "function") {
+            cb = callbackOrHost;
+          }
+        }
 
+        DropShareTCPSocket.serverListen(
+          this.serverId,
+          listenOptions,
+          (error: any, result: string) => {
+            if (error) {
+              this.emit("error", error);
+            } else if (cb) {
+              this.once("listening", cb);
+            }
+          }
+        );
+      })
+      .catch((error) => {
+        this.emit("error", error);
+      });
     return this;
   }
 
-  async close(callback?: () => void): Promise<this> {
+  close(callback?: (err?: Error) => void): this {
     if (this.closed || !this.serverId) {
       if (callback) callback();
       return this;
     }
 
-    try {
-      await TCPSocket.serverClose(this.serverId);
-      this.closed = true;
-      this.serverId = null;
-      this.connections.forEach((socket) => socket.destroy());
-      this.connections.clear();
-      if (callback) callback();
-    } catch (error) {
-      this.emit("error", error);
-    }
-
+    DropShareTCPSocket.serverClose(
+      this.serverId,
+      (error: any, result: string) => {
+        if (error) {
+          if (callback) callback(error);
+          this.emit("error", error);
+        } else {
+          this.closed = true;
+          this.listening = false;
+          this.serverId = null;
+          this.connections.forEach((socket) => socket.destroy());
+          this.connections.clear();
+          if (callback) callback();
+        }
+      }
+    );
     return this;
   }
 
   getConnections(callback: (error: Error | null, count: number) => void): void {
     callback(null, this.connections.size);
+  }
+
+  address(): { port: number; family: string; address: string } | null {
+    return null; // Implement if needed
+  }
+
+  ref(): this {
+    console.warn(
+      "react-native-tcp-socket: Server.ref() method will have no effect."
+    );
+    return this;
+  }
+
+  unref(): this {
+    console.warn(
+      "react-native-tcp-socket: Server.unref() method will have no effect."
+    );
+    return this;
   }
 }
 
@@ -404,5 +630,8 @@ export default {
   Socket,
   Server,
   createSocket: () => new Socket(),
-  createServer: () => new Server(),
+  createServer: (
+    options?: ServerOptions | ((socket: Socket) => void),
+    callback?: (socket: Socket) => void
+  ) => new Server(options, callback),
 };

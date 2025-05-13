@@ -5,9 +5,10 @@ import com.facebook.react.bridge.*
 import com.facebook.react.modules.core.DeviceEventManagerModule
 import kotlinx.coroutines.*
 import java.io.BufferedInputStream
+import java.io.ByteArrayOutputStream
 import java.io.IOException
 import java.io.InputStream
-import java.io.OutputStream
+import java.io.OutputStream // Added import
 import java.net.InetAddress
 import java.net.ServerSocket
 import java.net.Socket
@@ -16,15 +17,17 @@ import kotlin.coroutines.CoroutineContext
 
 class TCPSocketModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaModule(reactContext), CoroutineScope {
     private val TAG = "TCPSocketModule"
-    private val job = SupervisorJob() // Use SupervisorJob to prevent cancellation of other coroutines on error
+    private val job = SupervisorJob()
     override val coroutineContext: CoroutineContext
         get() = Dispatchers.IO + job
     private val servers = mutableMapOf<String, TcpServer>()
     private val sockets = mutableMapOf<String, TcpSocket>()
-    private var chunkBufferSize = 64 * 1024 // 64KB default
+    private var chunkBufferSize = 512 * 1024 // 512KB default
     private val maxConnectionRetries = 5
+    private var minFragmentSize = 512 * 1024 // 512KB for aggregation
+    private val maxWaitMs = 50L // 50ms timeout for aggregation
 
-    override fun getName(): String = "TCPSocket"
+    override fun getName(): String = "DropShareTCPSocket" // Match react-native-tcp-socket
 
     @ReactMethod
     fun createServer(promise: Promise) {
@@ -59,11 +62,12 @@ class TCPSocketModule(reactContext: ReactApplicationContext) : ReactContextBaseJ
                 promise.reject("CONFIG_ERROR", "Buffer size must be positive")
                 return
             }
-            if (size > 10 * 1024 * 1024) { // Limit to 10MB
+            if (size > 10 * 1024 * 1024) {
                 promise.reject("CONFIG_ERROR", "Buffer size too large")
                 return
             }
             chunkBufferSize = size
+            minFragmentSize = size
             Log.d(TAG, "Chunk buffer size set to $size bytes")
             promise.resolve("Buffer size updated")
         } catch (e: Exception) {
@@ -97,15 +101,13 @@ class TCPSocketModule(reactContext: ReactApplicationContext) : ReactContextBaseJ
     }
 
     @ReactMethod
-    fun socketConnect(socketId: String, options: ReadableMap, promise: Promise) {
+    fun connect(socketId: String, host: String, port: Int, options: ReadableMap, promise: Promise) {
         val socket = sockets[socketId] ?: run {
             promise.reject("SOCKET_ERROR", "Socket not found")
             return
         }
         launch {
             try {
-                val host = options.getString("host") ?: throw IOException("Host is required")
-                val port = options.getInt("port")
                 val localAddress = options.getString("localAddress")
                 val localPort = options.getInt("localPort") ?: 0
                 socket.connect(host, port, localAddress, localPort)
@@ -122,19 +124,24 @@ class TCPSocketModule(reactContext: ReactApplicationContext) : ReactContextBaseJ
     }
 
     @ReactMethod
-    fun socketWrite(socketId: String, data: ReadableArray, promise: Promise) {
+    fun write(socketId: String, base64Data: String, msgId: Int, promise: Promise) {
         val socket = sockets[socketId] ?: run {
             promise.reject("SOCKET_ERROR", "Socket not found or closed")
             return
         }
         launch {
             try {
-                val byteArray = ByteArray(data.size())
-                for (i in 0 until data.size()) {
-                    byteArray[i] = (data.getInt(i) and 0xFF).toByte()
-                }
-                socket.write(byteArray)
+                val data = android.util.Base64.decode(base64Data, android.util.Base64.DEFAULT)
+                val needsDrain = socket.write(data)
                 withContext(Dispatchers.Main) {
+                    val params = Arguments.createMap().apply {
+                        putString("id", socketId)
+                        putInt("msgId", msgId)
+                    }
+                    sendEvent("written", params)
+                    if (!needsDrain) {
+                        sendEvent("drain", Arguments.createMap().apply { putString("id", socketId) })
+                    }
                     promise.resolve("Data written")
                 }
             } catch (e: IOException) {
@@ -147,7 +154,7 @@ class TCPSocketModule(reactContext: ReactApplicationContext) : ReactContextBaseJ
     }
 
     @ReactMethod
-    fun socketEnd(socketId: String, promise: Promise) {
+    fun end(socketId: String, promise: Promise) {
         val socket = sockets[socketId] ?: run {
             promise.reject("SOCKET_ERROR", "Socket not found or closed")
             return
@@ -168,7 +175,7 @@ class TCPSocketModule(reactContext: ReactApplicationContext) : ReactContextBaseJ
     }
 
     @ReactMethod
-    fun socketDestroy(socketId: String, promise: Promise) {
+    fun destroy(socketId: String, promise: Promise) {
         val socket = sockets[socketId] ?: run {
             promise.resolve("Socket already closed")
             return
@@ -212,7 +219,7 @@ class TCPSocketModule(reactContext: ReactApplicationContext) : ReactContextBaseJ
     }
 
     @ReactMethod
-    fun socketPause(socketId: String, promise: Promise) {
+    fun pause(socketId: String, promise: Promise) {
         val socket = sockets[socketId] ?: run {
             promise.reject("SOCKET_ERROR", "Socket not found")
             return
@@ -222,13 +229,26 @@ class TCPSocketModule(reactContext: ReactApplicationContext) : ReactContextBaseJ
     }
 
     @ReactMethod
-    fun socketResume(socketId: String, promise: Promise) {
+    fun resume(socketId: String, promise: Promise) {
         val socket = sockets[socketId] ?: run {
             promise.reject("SOCKET_ERROR", "Socket not found")
             return
         }
         socket.resume()
         promise.resolve("Socket resumed")
+    }
+
+    @ReactMethod
+    fun setNoDelay(socketId: String, noDelay: Boolean, promise: Promise) {
+        configureSocket(socketId, Arguments.createMap().apply { putBoolean("noDelay", noDelay) }, promise)
+    }
+
+    @ReactMethod
+    fun setKeepAlive(socketId: String, enable: Boolean, initialDelay: Int, promise: Promise) {
+        configureSocket(socketId, Arguments.createMap().apply {
+            putBoolean("keepAlive", enable)
+            putInt("initialDelay", initialDelay)
+        }, promise)
     }
 
     @ReactMethod
@@ -289,6 +309,7 @@ class TCPSocketModule(reactContext: ReactApplicationContext) : ReactContextBaseJ
         fun listen(port: Int, host: String, reuseAddress: Boolean) {
             serverSocket = ServerSocket(port, 50, InetAddress.getByName(host))
             serverSocket?.reuseAddress = reuseAddress
+            serverSocket?.receiveBufferSize = chunkBufferSize
             isRunning = true
             val params = Arguments.createMap().apply {
                 putString("id", id)
@@ -307,6 +328,7 @@ class TCPSocketModule(reactContext: ReactApplicationContext) : ReactContextBaseJ
             while (isRunning && serverSocket != null && !serverSocket!!.isClosed && retryCount < maxConnectionRetries) {
                 try {
                     val clientSocket = serverSocket!!.accept()
+                    clientSocket.receiveBufferSize = chunkBufferSize
                     retryCount = 0
                     val socketId = UUID.randomUUID().toString()
                     val client = TcpSocket(socketId, clientSocket)
@@ -365,9 +387,12 @@ class TCPSocketModule(reactContext: ReactApplicationContext) : ReactContextBaseJ
         private var isPaused = false
         private var outputStream: OutputStream? = null
         private var isEnded = false
+        private val writeBuffer = ByteArrayOutputStream()
+        private var writeBufferSize = 0
 
         fun connect(host: String, port: Int, localAddress: String?, localPort: Int) {
             socket = Socket()
+            socket?.receiveBufferSize = chunkBufferSize
             if (localAddress != null) {
                 socket!!.bind(java.net.InetSocketAddress(localAddress, localPort))
             }
@@ -387,19 +412,44 @@ class TCPSocketModule(reactContext: ReactApplicationContext) : ReactContextBaseJ
             startReading()
         }
 
-        fun write(data: ByteArray) {
+        fun write(data: ByteArray): Boolean {
             if (socket?.isClosed == true || outputStream == null) {
                 throw IOException("Socket is closed")
             }
-            outputStream!!.write(data)
-            outputStream!!.flush()
-            Log.d(TAG, "Wrote ${data.size} bytes to socket $id")
+            synchronized(writeBuffer) {
+                writeBuffer.write(data)
+                writeBufferSize += data.size
+                if (writeBufferSize >= chunkBufferSize) {
+                    val bufferData = writeBuffer.toByteArray()
+                    outputStream?.write(bufferData)
+                    outputStream?.flush()
+                    writeBuffer.reset()
+                    writeBufferSize = 0
+                    Log.d(TAG, "Wrote ${bufferData.size} bytes to socket $id")
+                    return true
+                }
+                return false
+            }
+        }
+
+        fun flushWriteBuffer() {
+            synchronized(writeBuffer) {
+                if (writeBufferSize > 0) {
+                    val bufferData = writeBuffer.toByteArray()
+                    outputStream?.write(bufferData)
+                    outputStream?.flush()
+                    writeBuffer.reset()
+                    writeBufferSize = 0
+                    Log.d(TAG, "Flushed ${bufferData.size} bytes to socket $id")
+                }
+            }
         }
 
         fun end() {
             if (isEnded) return
             isEnded = true
             try {
+                flushWriteBuffer()
                 socket?.shutdownOutput()
             } catch (e: IOException) {
                 Log.e(TAG, "Error shutting down output for socket $id", e)
@@ -408,6 +458,7 @@ class TCPSocketModule(reactContext: ReactApplicationContext) : ReactContextBaseJ
 
         fun destroy() {
             try {
+                flushWriteBuffer()
                 socket?.close()
                 socket = null
                 outputStream = null
@@ -451,19 +502,33 @@ class TCPSocketModule(reactContext: ReactApplicationContext) : ReactContextBaseJ
                     socket?.getInputStream()?.let { inputStream ->
                         BufferedInputStream(inputStream, chunkBufferSize).use { bufferedInput ->
                             val buffer = ByteArray(chunkBufferSize)
+                            val aggregatedBuffer = ByteArrayOutputStream()
                             while (socket != null && socket!!.isClosed.not()) {
+                                val startTime = System.currentTimeMillis()
                                 val bytesRead = bufferedInput.read(buffer)
-                                if (bytesRead == -1) break // End of stream
-                                while (isPaused) delay(100)
-                                val data = ByteArray(bytesRead)
-                                System.arraycopy(buffer, 0, data, 0, bytesRead)
-                                val readableArray = Arguments.createArray()
-                                for (byte in data) {
-                                    readableArray.pushInt(byte.toInt() and 0xFF)
+                                if (bytesRead == -1) break
+                                aggregatedBuffer.write(buffer, 0, bytesRead)
+                                while (aggregatedBuffer.size() >= minFragmentSize ||
+                                       (aggregatedBuffer.size() > 0 && System.currentTimeMillis() - startTime >= maxWaitMs)) {
+                                    val data = aggregatedBuffer.toByteArray()
+                                    aggregatedBuffer.reset()
+                                    while (isPaused) delay(100)
+                                    val base64Data = android.util.Base64.encodeToString(data, android.util.Base64.DEFAULT)
+                                    val params = Arguments.createMap().apply {
+                                        putString("id", id)
+                                        putString("data", base64Data)
+                                    }
+                                    withContext(Dispatchers.Main) {
+                                        sendEvent("data", params)
+                                    }
                                 }
+                            }
+                            if (aggregatedBuffer.size() > 0) {
+                                val data = aggregatedBuffer.toByteArray()
+                                val base64Data = android.util.Base64.encodeToString(data, android.util.Base64.DEFAULT)
                                 val params = Arguments.createMap().apply {
                                     putString("id", id)
-                                    putArray("data", readableArray)
+                                    putString("data", base64Data)
                                 }
                                 withContext(Dispatchers.Main) {
                                     sendEvent("data", params)

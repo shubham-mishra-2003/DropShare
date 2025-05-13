@@ -5,6 +5,7 @@ import {
   TouchableOpacity,
   ScrollView,
   RefreshControl,
+  NativeModules,
 } from "react-native";
 import { useFocusEffect } from "@react-navigation/native";
 import { navigate, resetAndNavigate } from "../utils/NavigationUtil";
@@ -131,6 +132,8 @@ const HomeContent: React.FC = () => {
     }
   }, [isHostConnected, isClientConnected]);
 
+  const { DropShareTCPSocket } = NativeModules;
+
   return (
     <LinearGradient
       start={{ x: 0, y: 0 }}
@@ -138,6 +141,11 @@ const HomeContent: React.FC = () => {
       colors={Colors[colorScheme].linearGradientColors}
       style={styles.mainView}
     >
+      <TouchableOpacity
+        onPress={() => console.log("Module: ", DropShareTCPSocket)}
+      >
+        <StyledText text="Module" />
+      </TouchableOpacity>
       <View style={{ paddingHorizontal: 10 }}>
         <StyledText text="Files" fontWeight="bold" fontSize={55} />
       </View>
