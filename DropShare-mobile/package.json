@@ -26,6 +26,7 @@
     "onnxruntime-react-native": "^1.21.0",
     "react": "19.0.0",
     "react-native": "0.78.0",
+    "react-native-aes-crypto": "^3.2.1",
     "react-native-blob-util": "^0.21.2",
     "react-native-crypto": "^2.2.0",
     "react-native-device-info": "^14.0.4",

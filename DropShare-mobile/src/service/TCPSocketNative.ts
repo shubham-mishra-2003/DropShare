@@ -33,7 +33,7 @@ type SocketOptions = {
 };
 
 type ServerOptions = {
-  port?: number; // Made optional to allow {}
+  port?: number;
   host?: string;
   reuseAddress?: boolean;
   noDelay?: boolean;
@@ -58,8 +58,8 @@ export class Socket extends EventEmitter {
   private pending: boolean = true;
   private encoding: BufferEncoding | null = null;
   private writeBufferSize: number = 0;
-  public bytesRead: number = 0; // Changed to public, removed getter
-  public bytesWritten: number = 0; // Changed to public, removed getter
+  public bytesRead: number = 0;
+  public bytesWritten: number = 0;
   private msgId: number = 0;
   private initialized: Promise<void>;
   public readableHighWaterMark: number = 512 * 1024;
@@ -409,7 +409,7 @@ export class Server extends EventEmitter {
   private listening: boolean = false;
   private connections: Map<string, Socket> = new Map();
   private initialized: Promise<void>;
-  private serverOptions: ServerOptions = {}; // Now compatible with optional port
+  private serverOptions: ServerOptions = {};
 
   constructor(
     options?: ServerOptions | ((socket: Socket) => void),
@@ -429,10 +429,13 @@ export class Server extends EventEmitter {
   private async initializeServer() {
     try {
       this.serverId = await new Promise((resolve, reject) => {
-        DropShareTCPSocket.createServer((error: any, serverId: string) => {
-          if (error) reject(error);
-          else resolve(serverId);
-        });
+        DropShareTCPSocket.createServer(
+          null,
+          (error: any, serverId: string) => {
+            if (error) reject(error);
+            else resolve(serverId);
+          }
+        );
       });
       this.setupEventListeners();
     } catch (error) {
@@ -608,7 +611,7 @@ export class Server extends EventEmitter {
   }
 
   address(): { port: number; family: string; address: string } | null {
-    return null; // Implement if needed
+    return null;
   }
 
   ref(): this {

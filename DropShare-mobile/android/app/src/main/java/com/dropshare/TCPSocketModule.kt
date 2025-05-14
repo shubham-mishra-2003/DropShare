@@ -8,7 +8,7 @@ import java.io.BufferedInputStream
 import java.io.ByteArrayOutputStream
 import java.io.IOException
 import java.io.InputStream
-import java.io.OutputStream // Added import
+import java.io.OutputStream
 import java.net.InetAddress
 import java.net.ServerSocket
 import java.net.Socket
@@ -22,12 +22,12 @@ class TCPSocketModule(reactContext: ReactApplicationContext) : ReactContextBaseJ
         get() = Dispatchers.IO + job
     private val servers = mutableMapOf<String, TcpServer>()
     private val sockets = mutableMapOf<String, TcpSocket>()
-    private var chunkBufferSize = 512 * 1024 // 512KB default
+    private var chunkBufferSize = 512 * 1024
     private val maxConnectionRetries = 5
-    private var minFragmentSize = 512 * 1024 // 512KB for aggregation
-    private val maxWaitMs = 50L // 50ms timeout for aggregation
+    private var minFragmentSize = 512 * 1024
+    private val maxWaitMs = 50L
 
-    override fun getName(): String = "DropShareTCPSocket" // Match react-native-tcp-socket
+    override fun getName(): String = "DropShareTCPSocket"
 
     @ReactMethod
     fun createServer(promise: Promise) {
@@ -84,7 +84,7 @@ class TCPSocketModule(reactContext: ReactApplicationContext) : ReactContextBaseJ
         }
         launch {
             try {
-                val port = options.getInt("port")
+                val port = if (options.hasKey("port")) options.getInt("port") else 0
                 val host = options.getString("host") ?: "0.0.0.0"
                 val reuseAddress = options.getBoolean("reuseAddress") ?: true
                 server.listen(port, host, reuseAddress)
@@ -108,8 +108,8 @@ class TCPSocketModule(reactContext: ReactApplicationContext) : ReactContextBaseJ
         }
         launch {
             try {
-                val localAddress = options.getString("localAddress")
-                val localPort = options.getInt("localPort") ?: 0
+                val localAddress = if (options.hasKey("localAddress")) options.getString("localAddress") else null
+                val localPort = if (options.hasKey("localPort")) options.getInt("localPort") else 0
                 socket.connect(host, port, localAddress, localPort)
                 withContext(Dispatchers.Main) {
                     promise.resolve(socketId)
