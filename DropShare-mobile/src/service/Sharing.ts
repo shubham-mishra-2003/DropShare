@@ -1,3 +1,4 @@
+import dgram from "react-native-udp";
 import {
   calculateDynamicChunkDivision,
   checkTransferLimits,
@@ -14,6 +15,8 @@ import {
 } from "../utils/FileSystemUtil";
 import { ChunkStorage } from "./ChunkStorage";
 import { CryptoUtil } from "./Crypto";
+
+type UdpSocket = ReturnType<typeof dgram.createSocket>;
 
 interface FileHeader {
   protocolVersion: string;
@@ -85,6 +88,9 @@ interface FileTransfer {
   speedWindow: { bytes: number; timestamp: number }[];
   isPaused: boolean;
   pauseResolve?: () => void;
+  udpSocket?: UdpSocket; // For receiver
+  udpPort?: number; // For receiver
+  receivedChunkIndices: Set<number>; // Track received chunks
 }
 
 interface ReceiveProps {
@@ -105,11 +111,37 @@ let receivingFile = false;
 let fileId = "";
 let lastLoggedBatchIndex: number | null = null;
 
+let sendUdpSocket: UdpSocket | null = null;
+
 const MAX_RETRIES = 3;
 const ACK_TIMEOUT = 15000;
 const PROTOCOL_VERSION = "1.0";
 const SPEED_WINDOW_DURATION = 1000;
-const MAX_CHUNKS_PER_BATCH = 5;
+const MAX_CHUNKS_PER_BATCH = 1;
+const UDP_PORT = 2516; // Fixed port for consistency
+
+function getSendUdpSocket(): UdpSocket {
+  if (!sendUdpSocket) {
+    sendUdpSocket = dgram.createSocket({ type: "udp6", reusePort: true });
+    sendUdpSocket.bind(UDP_PORT, () => {
+      Logger.info(`Shared UDP socket bound to port ${UDP_PORT} for sending`);
+    });
+    sendUdpSocket.on("error", (err) => {
+      Logger.error("Sender UDP socket error", err);
+      sendUdpSocket?.close();
+      sendUdpSocket = null;
+    });
+  }
+  return sendUdpSocket;
+}
+
+function closeSendUdpSocket() {
+  if (sendUdpSocket && fileTransfers.size === 0) {
+    sendUdpSocket.close();
+    Logger.info("Closed shared UDP socket for sending");
+    sendUdpSocket = null;
+  }
+}
 
 export const Sharing = (role: "host" | "client") => {
   function updateTransferSpeed(
@@ -246,6 +278,11 @@ export const Sharing = (role: "host" | "client") => {
       Logger.info(`Sent CANCEL for ${fileId}`);
     }
 
+    if (transfer.udpSocket) {
+      transfer.udpSocket.close();
+      Logger.info(`Closed UDP socket for transfer ${fileId}`);
+    }
+
     await ChunkStorage.storeTransfer(
       fileId,
       transfer.fileName,
@@ -283,6 +320,7 @@ export const Sharing = (role: "host" | "client") => {
       receivingFile = false;
       fileId = "";
     }
+    closeSendUdpSocket();
   }
 
   async function sendFile(
@@ -320,8 +358,12 @@ export const Sharing = (role: "host" | "client") => {
       lastChunkIndex: -1,
       speedWindow: [],
       isPaused: false,
+      receivedChunkIndices: new Set(),
     };
     fileTransfers.set(fileId, transfer);
+
+    let receiverUdpPort: number | null = null;
+    let receiverIp: string | null = null;
 
     try {
       const stat = await RNFS.stat(filePath);
@@ -410,7 +452,21 @@ export const Sharing = (role: "host" | "client") => {
               if (message.startsWith(`ACK_FILE:${fileId}`)) {
                 const parts = message.split(":");
                 const chunkIndex =
-                  parts.length > 2 ? parseInt(parts[2], 10) : -1;
+                  parts.length > 2 && parts[2] ? parseInt(parts[2], 10) : -1;
+                receiverUdpPort =
+                  parts.length > 3 && parts[3]
+                    ? parseInt(parts[3].split("\n")[0], 10)
+                    : null;
+                receiverIp = socket.remoteAddress || null;
+                if (!receiverUdpPort || receiverUdpPort <= 0) {
+                  reject(
+                    new DropShareError(
+                      ERROR_CODES.NETWORK_ERROR,
+                      `Invalid receiver UDP port: ${receiverUdpPort}`
+                    )
+                  );
+                  return;
+                }
                 if (chunkIndex >= 0 && chunkIndex < totalChunks) {
                   startChunkIndex = chunkIndex + 1;
                   transfer.receivedBytes = startChunkIndex * chunkSize;
@@ -421,6 +477,9 @@ export const Sharing = (role: "host" | "client") => {
                     `Resuming transfer for ${fileId} from chunk ${startChunkIndex}`
                   );
                 }
+                Logger.info(
+                  `Received receiver UDP port ${receiverUdpPort} for ${fileId}`
+                );
                 resolve();
               } else if (message.startsWith(`CANCEL:${fileId}`)) {
                 reject(
@@ -463,6 +522,7 @@ export const Sharing = (role: "host" | "client") => {
             Logger.info(`Sent header for ${fileId}: ${JSON.stringify(header)}`);
           });
 
+          const udpSocket = getSendUdpSocket();
           let sentBytes = startChunkIndex * chunkSize;
           const startBatchIndex = Math.floor(
             startChunkIndex / MAX_CHUNKS_PER_BATCH
@@ -579,22 +639,39 @@ export const Sharing = (role: "host" | "client") => {
               })}\n\n`
             );
             const batchBuffer = Buffer.concat([batchHeader, ...batchBuffers]);
-            socket.write(batchBuffer);
-            updateTransferSpeed(
-              transfer,
-              batchBuffer.length,
-              setTransferProgress
-            );
-            Logger.info(
-              `Sent batch ${batchIndex}/${totalBatches} for ${fileId} (${batchBuffers.length} chunks)`
-            );
-
-            const percentage = (sentBytes / fileSize) * 100;
-            transfer.receivedBytes = sentBytes;
-            transfer.progress = percentage;
-            transfer.lastChunkIndex =
-              batchStartChunkIndex + batchBuffers.length - 1;
-            fileTransfers.set(fileId, transfer);
+            await new Promise<void>((resolve, reject) => {
+              udpSocket.send(
+                batchBuffer,
+                0,
+                batchBuffer.length,
+                receiverUdpPort!,
+                receiverIp!,
+                (err) => {
+                  if (err) {
+                    Logger.error(
+                      `UDP send error for batch ${batchIndex} of ${fileId}`,
+                      err
+                    );
+                    reject(
+                      new DropShareError(
+                        ERROR_CODES.NETWORK_ERROR,
+                        `UDP send failed: ${err.message}`
+                      )
+                    );
+                  } else {
+                    updateTransferSpeed(
+                      transfer,
+                      batchBuffer.length,
+                      setTransferProgress
+                    );
+                    Logger.info(
+                      `Sent batch ${batchIndex}/${totalBatches} for ${fileId} (${batchBuffers.length} chunks) via UDP`
+                    );
+                    resolve();
+                  }
+                }
+              );
+            });
 
             await new Promise<void>((resolve, reject) => {
               const timeout = setTimeout(() => {
@@ -695,6 +772,12 @@ export const Sharing = (role: "host" | "client") => {
               };
               checkAck();
             });
+
+            transfer.receivedBytes = sentBytes;
+            transfer.progress = (sentBytes / fileSize) * 100;
+            transfer.lastChunkIndex =
+              batchStartChunkIndex + batchBuffers.length - 1;
+            fileTransfers.set(fileId, transfer);
           }
 
           await new Promise<void>((resolve, reject) => {
@@ -816,6 +899,7 @@ export const Sharing = (role: "host" | "client") => {
         transfer.status === "Cancelled"
       ) {
         fileTransfers.delete(fileId);
+        closeSendUdpSocket();
       }
     }
   }
@@ -953,342 +1037,7 @@ export const Sharing = (role: "host" | "client") => {
             return;
           }
 
-          if (dataStr.startsWith("BATCH:")) {
-            if (nextDoubleNewline === -1) {
-              Logger.info(`Incomplete BATCH header from ${source}, waiting...`);
-              return;
-            }
-            const headerStr = buffer.slice(6, nextDoubleNewline).toString();
-            let batchData: {
-              fileId: string;
-              batchIndex: number;
-              chunkCount: number;
-            };
-            try {
-              batchData = JSON.parse(headerStr);
-            } catch (error) {
-              Logger.error(
-                `Failed to parse BATCH header for fileId ${fileId}: ${headerStr}`,
-                error
-              );
-              throw new DropShareError(
-                ERROR_CODES.INVALID_HEADER,
-                "Invalid batch header"
-              );
-            }
-
-            const transfer = fileTransfers.get(batchData.fileId);
-            if (!transfer) {
-              Logger.error(`No transfer found for fileId ${batchData.fileId}`);
-              throw new DropShareError(
-                ERROR_CODES.INVALID_HEADER,
-                "No active transfer for fileId"
-              );
-            }
-
-            let bufferPosition = nextDoubleNewline + 2;
-            const batchChunks: { index: number; encryptedData: Buffer }[] = [];
-            let totalBytesReceived = 0;
-            const batchStartTime = Date.now();
-
-            // Collect all chunks in the batch
-            for (let i = 0; i < batchData.chunkCount; i++) {
-              if (bufferPosition >= buffer.length) {
-                if (lastLoggedBatchIndex !== batchData.batchIndex) {
-                  Logger.info(
-                    `Waiting for chunk data for ${
-                      batchData.fileId
-                    } (chunkIndex: ${
-                      batchChunks.length +
-                      batchData.batchIndex * MAX_CHUNKS_PER_BATCH
-                    }, expected chunk size)`
-                  );
-                  lastLoggedBatchIndex = batchData.batchIndex;
-                }
-                return;
-              }
-
-              const chunkHeaderEnd = buffer.indexOf(
-                Buffer.from("\n\n"),
-                bufferPosition
-              );
-              if (chunkHeaderEnd === -1) {
-                Logger.info(
-                  `Incomplete CHUNK header in batch ${batchData.batchIndex}, waiting...`
-                );
-                return;
-              }
-
-              const chunkHeaderStr = buffer
-                .slice(bufferPosition + 6, chunkHeaderEnd)
-                .toString();
-              let chunkData: {
-                fileId: string;
-                chunkIndex: number;
-                chunkSize: number;
-              };
-              try {
-                chunkData = JSON.parse(chunkHeaderStr);
-              } catch (error) {
-                Logger.error(
-                  `Failed to parse CHUNK header in batch ${batchData.batchIndex}: ${chunkHeaderStr}`,
-                  error
-                );
-                throw new DropShareError(
-                  ERROR_CODES.INVALID_HEADER,
-                  "Invalid chunk header in batch"
-                );
-              }
-
-              const chunkStart = chunkHeaderEnd + 2;
-              const chunkEnd = chunkStart + chunkData.chunkSize;
-
-              if (buffer.length < chunkEnd) {
-                if (lastLoggedBatchIndex !== batchData.batchIndex) {
-                  Logger.info(
-                    `Waiting for chunk data for ${chunkData.fileId} (chunkIndex: ${chunkData.chunkIndex}, expected ${chunkData.chunkSize} bytes)`
-                  );
-                  lastLoggedBatchIndex = batchData.batchIndex;
-                }
-                return;
-              }
-
-              const encryptedChunk = buffer.slice(chunkStart, chunkEnd);
-              if (encryptedChunk.length !== chunkData.chunkSize) {
-                Logger.error(
-                  `Chunk size mismatch for ${chunkData.fileId} (chunkIndex: ${chunkData.chunkIndex}): expected ${chunkData.chunkSize}, received ${encryptedChunk.length}`
-                );
-                throw new DropShareError(
-                  ERROR_CODES.CORRUPTED_CHUNK,
-                  `Chunk size mismatch: expected ${chunkData.chunkSize}, received ${encryptedChunk.length}`
-                );
-              }
-
-              if (encryptedChunk.length % 16 !== 0) {
-                Logger.error(
-                  `Invalid encrypted chunk length for ${chunkData.fileId} (chunkIndex: ${chunkData.chunkIndex}): ${encryptedChunk.length} bytes`
-                );
-                throw new DropShareError(
-                  ERROR_CODES.CORRUPTED_CHUNK,
-                  `Invalid encrypted chunk length: ${encryptedChunk.length} bytes`
-                );
-              }
-
-              batchChunks.push({
-                index: chunkData.chunkIndex,
-                encryptedData: encryptedChunk,
-              });
-              totalBytesReceived += chunkData.chunkSize;
-              bufferPosition = chunkEnd;
-            }
-
-            Logger.info(
-              `Received batch ${batchData.batchIndex} for ${
-                batchData.fileId
-              } (${batchData.chunkCount} chunks) in ${
-                (Date.now() - batchStartTime) / 1000
-              } seconds`
-            );
-
-            // Decrypt all chunks in the batch
-            transfer.status = "Decrypting";
-            fileTransfers.set(batchData.fileId, transfer);
-            setTransferProgress?.((prev) => {
-              const updated = prev.filter((p) => p.fileId !== batchData.fileId);
-              return [
-                ...updated,
-                {
-                  fileId: transfer.fileId,
-                  fileName: transfer.fileName,
-                  transferredBytes: transfer.receivedBytes,
-                  fileSize: transfer.totalSize,
-                  speed: 0,
-                  status: transfer.status,
-                  error: transfer.error,
-                  isPaused: transfer.isPaused,
-                },
-              ];
-            });
-
-            const decryptedChunks: Buffer[] = [];
-            for (const chunk of batchChunks) {
-              Logger.info(
-                `Decrypting chunk ${chunk.index} for ${batchData.fileId} (${chunk.encryptedData.length} bytes)`
-              );
-              const decryptedData = await CryptoUtil.decryptChunk(
-                chunk.encryptedData,
-                Buffer.from(transfer.aesKey!, "hex"),
-                Buffer.from(transfer.iv!, "hex")
-              );
-              decryptedChunks.push(decryptedData);
-            }
-
-            transfer.status = "Receiving";
-            fileTransfers.set(batchData.fileId, transfer);
-            setTransferProgress?.((prev) => {
-              const updated = prev.filter((p) => p.fileId !== batchData.fileId);
-              return [
-                ...updated,
-                {
-                  fileId: transfer.fileId,
-                  fileName: transfer.fileName,
-                  transferredBytes: transfer.receivedBytes,
-                  fileSize: transfer.totalSize,
-                  speed: 0,
-                  status: transfer.status,
-                  error: transfer.error,
-                  isPaused: transfer.isPaused,
-                },
-              ];
-            });
-
-            // Combine decrypted chunks and write to file
-            const tempPath = `${TEMP_CHUNKS_PATH}/${batchData.fileId}`;
-            if (!(await RNFS.exists(TEMP_CHUNKS_PATH))) {
-              await RNFS.mkdir(TEMP_CHUNKS_PATH);
-            }
-
-            const batchDataBuffer = Buffer.concat(
-              decryptedChunks.sort(
-                (a, b) =>
-                  batchChunks.find((c) => c.encryptedData === a)?.index! -
-                  batchChunks.find((c) => c.encryptedData === b)?.index!
-              )
-            );
-            const base64Batch = batchDataBuffer.toString("base64");
-            await RNFS.appendFile(tempPath, base64Batch, "base64");
-
-            Logger.info(
-              `Wrote batch ${batchData.batchIndex} for ${
-                batchData.fileId
-              } to file in ${(Date.now() - batchStartTime) / 1000} seconds`
-            );
-
-            // Update transfer state
-            batchChunks.forEach((chunk, i) => {
-              transfer.chunks[chunk.index] = decryptedChunks[i];
-            });
-            transfer.receivedBytes += decryptedChunks.reduce(
-              (sum, chunk) => sum + chunk.length,
-              0
-            );
-            transfer.progress =
-              (transfer.receivedBytes / transfer.totalSize) * 100;
-            transfer.lastChunkIndex = Math.max(
-              ...batchChunks.map((c) => c.index)
-            );
-            fileTransfers.set(batchData.fileId, transfer);
-
-            await ChunkStorage.storeTransfer(
-              batchData.fileId,
-              transfer.fileName,
-              transfer.fileSize,
-              transfer.totalChunks,
-              transfer.chunkSize,
-              transfer.lastChunkIndex,
-              tempPath
-            );
-
-            // Send ACK for the batch
-            const ackBuffer = Buffer.from(
-              `ACK_BATCH:${batchData.fileId}:${batchData.batchIndex}:${batchData.chunkCount}\n`
-            );
-            socket.write(ackBuffer);
-            updateTransferSpeed(
-              transfer,
-              ackBuffer.length,
-              setTransferProgress
-            );
-
-            Logger.info(
-              `Processed batch ${batchData.batchIndex} for ${batchData.fileId} (${batchData.chunkCount} chunks)`
-            );
-
-            // Slice buffer to remove processed batch
-            buffer = buffer.slice(bufferPosition);
-
-            // Check if transfer is complete
-            if (transfer.receivedBytes >= transfer.totalSize) {
-              if (!(await RNFS.exists(SAVE_PATH))) {
-                await RNFS.mkdir(SAVE_PATH);
-                Logger.info(`Created directory ${SAVE_PATH}`);
-              }
-
-              const sanitizedFileName = transfer.fileName.replace(
-                /[^a-zA-Z0-9.-]/g,
-                "_"
-              );
-
-              const fileNameParts = sanitizedFileName.split(".");
-              const fileExtension =
-                fileNameParts.length > 1 ? fileNameParts.pop() : "";
-              const baseName = fileNameParts.join(".");
-              const finalfileName = `${baseName}_DropShare_${formatDate(
-                new Date()
-              )}.${fileExtension}`;
-
-              const finalPath = `${SAVE_PATH}/${finalfileName}`;
-
-              try {
-                await RNFS.moveFile(tempPath, finalPath);
-                setReceivedFiles((prev) => [...prev, finalPath]);
-                Logger.info(
-                  `Received and saved file: ${finalPath} from ${transfer.deviceName}`
-                );
-                transfer.status = "Completed";
-                transfer.endTime = Date.now();
-                const ackCompleteBuffer = Buffer.from(
-                  `ACK_COMPLETE:${batchData.fileId}\n`
-                );
-                socket.write(ackCompleteBuffer);
-                updateTransferSpeed(
-                  transfer,
-                  ackCompleteBuffer.length,
-                  setTransferProgress
-                );
-
-                setTransferProgress?.((prev: TransferProgress[]) => {
-                  const updated = prev.filter(
-                    (p) => p.fileId !== batchData.fileId
-                  );
-                  return [
-                    ...updated,
-                    {
-                      fileId: batchData.fileId,
-                      fileName: transfer.fileName,
-                      transferredBytes: transfer.receivedBytes,
-                      fileSize: transfer.totalSize,
-                      speed:
-                        transfer.receivedBytes /
-                        ((Date.now() - transfer.startTime) / 1000 || 1),
-                      status: "Completed",
-                      isPaused: false,
-                    },
-                  ];
-                });
-
-                await ChunkStorage.deleteTransfer(batchData.fileId);
-              } catch (error) {
-                Logger.error(`Failed to move file to ${finalPath}`, error);
-                throw new DropShareError(
-                  ERROR_CODES.DATABASE_WRITE_ERROR,
-                  `Failed to save file: ${
-                    error instanceof Error ? error.message : "Unknown error"
-                  }`
-                );
-              } finally {
-                if (await RNFS.exists(tempPath)) {
-                  await RNFS.unlink(tempPath).catch((err) =>
-                    Logger.error(`Failed to delete temp file ${tempPath}`, err)
-                  );
-                }
-                fileTransfers.delete(batchData.fileId);
-                receivingFile = false;
-                fileId = "";
-              }
-            }
-            continue;
-          } else if (dataStr.startsWith("RESET:")) {
+          if (dataStr.startsWith("RESET:")) {
             if (nextNewline === -1) {
               Logger.info(`Incomplete RESET from ${source}, waiting...`);
               return;
@@ -1297,16 +1046,21 @@ export const Sharing = (role: "host" | "client") => {
             Logger.info(`Received RESET for fileId ${resetFileId}`);
             if (resetFileId === fileId || !fileId) {
               receivingFile = false;
+              const transfer = fileTransfers.get(resetFileId);
+              if (transfer && transfer.udpSocket) {
+                transfer.udpSocket.close();
+                Logger.info(`Closed UDP socket for transfer ${resetFileId}`);
+              }
               fileTransfers.delete(resetFileId);
               await ChunkStorage.deleteTransfer(resetFileId);
               fileId = "";
             }
             const ackBuffer = Buffer.from(`ACK_RESET:${resetFileId}\n`);
             socket.write(ackBuffer);
-            const transfer = fileTransfers.get(resetFileId);
-            if (transfer) {
+            const transferReset = fileTransfers.get(resetFileId);
+            if (transferReset) {
               updateTransferSpeed(
-                transfer,
+                transferReset,
                 ackBuffer.length,
                 setTransferProgress
               );
@@ -1354,25 +1108,29 @@ export const Sharing = (role: "host" | "client") => {
                 `Detected retransmission for fileId ${fileId}, resetting state`
               );
               receivingFile = false;
+              const transfer = fileTransfers.get(fileId);
+              if (transfer && transfer.udpSocket) {
+                transfer.udpSocket.close();
+                Logger.info(`Closed UDP socket for transfer ${fileId}`);
+              }
               fileTransfers.delete(fileId);
               await ChunkStorage.deleteTransfer(fileId);
               await initializeFileTransfer(
                 headerData,
                 socket,
+                setReceivedFiles,
                 setTransferProgress
               );
               const existingTransfer = await ChunkStorage.getTransfer(fileId);
               const lastChunkIndex = existingTransfer
                 ? existingTransfer.lastChunkIndex
                 : -1;
-              const ackBuffer = Buffer.from(
-                `ACK_FILE:${fileId}${
-                  lastChunkIndex >= 0 ? `:${lastChunkIndex}` : ""
-                }\n`
-              );
-              socket.write(ackBuffer);
-              const transfer = fileTransfers.get(fileId);
+              fileTransfers.get(fileId);
               if (transfer) {
+                const ackBuffer = Buffer.from(
+                  `ACK_FILE:${fileId}:${lastChunkIndex}:${transfer.udpPort}\n`
+                );
+                socket.write(ackBuffer);
                 updateTransferSpeed(
                   transfer,
                   ackBuffer.length,
@@ -1442,8 +1200,10 @@ export const Sharing = (role: "host" | "client") => {
             await initializeFileTransfer(
               headerData,
               socket,
+              setReceivedFiles,
               setTransferProgress
             );
+            const transfer = fileTransfers.get(headerData.fileId);
             const existingTransfer = await ChunkStorage.getTransfer(
               headerData.fileId
             );
@@ -1451,19 +1211,16 @@ export const Sharing = (role: "host" | "client") => {
               ? existingTransfer.lastChunkIndex
               : -1;
             const ackBuffer = Buffer.from(
-              `ACK_FILE:${headerData.fileId}${
-                lastChunkIndex >= 0 ? `:${lastChunkIndex}` : ""
+              `ACK_FILE:${headerData.fileId}:${lastChunkIndex}:${
+                transfer!.udpPort
               }\n`
             );
             socket.write(ackBuffer);
-            const transfer = fileTransfers.get(headerData.fileId);
-            if (transfer) {
-              updateTransferSpeed(
-                transfer,
-                ackBuffer.length,
-                setTransferProgress
-              );
-            }
+            updateTransferSpeed(
+              transfer!,
+              ackBuffer.length,
+              setTransferProgress
+            );
             buffer = buffer.slice(nextDoubleNewline + 2);
             receivingFile = true;
             continue;
@@ -1474,7 +1231,8 @@ export const Sharing = (role: "host" | "client") => {
           dataStr.startsWith("ACK_FILE:") ||
           dataStr.startsWith("ACK_COMPLETE:") ||
           dataStr.startsWith("ACK_BATCH:") ||
-          dataStr.startsWith("ACK_CANCEL:")
+          dataStr.startsWith("ACK_CANCEL:") ||
+          dataStr.startsWith("ACK_RESET:")
         ) {
           if (nextNewline === -1) {
             Logger.info(
@@ -1510,6 +1268,11 @@ export const Sharing = (role: "host" | "client") => {
       socket.write(Buffer.from(`ERROR:${err.code}:${err.message}\n`));
       buffer = Buffer.alloc(0);
       receivingFile = false;
+      const transfer = fileTransfers.get(fileId);
+      if (transfer && transfer.udpSocket) {
+        transfer.udpSocket.close();
+        Logger.info(`Closed UDP socket for transfer ${fileId}`);
+      }
       fileTransfers.delete(fileId);
       await ChunkStorage.deleteTransfer(fileId);
       fileId = "";
@@ -1535,6 +1298,7 @@ export const Sharing = (role: "host" | "client") => {
   async function initializeFileTransfer(
     headerData: FileHeader,
     socket: TCPSocket.Socket,
+    setReceivedFiles: React.Dispatch<React.SetStateAction<string[]>>,
     setTransferProgress?: React.Dispatch<
       React.SetStateAction<TransferProgress[]>
     >
@@ -1657,6 +1421,25 @@ export const Sharing = (role: "host" | "client") => {
       }
     }
 
+    const udpSocket = dgram.createSocket({ type: "udp6", reusePort: true });
+    await new Promise<void>((resolve, reject) => {
+      udpSocket.bind(UDP_PORT, (err: any) => {
+        if (err) {
+          Logger.error(`Failed to bind UDP socket for ${fileId}`, err);
+          reject(
+            new DropShareError(
+              ERROR_CODES.NETWORK_ERROR,
+              `UDP bind failed: ${err.message}`
+            )
+          );
+        } else {
+          const address = udpSocket.address();
+          Logger.info(`UDP socket bound to port ${address.port} for ${fileId}`);
+          resolve();
+        }
+      });
+    });
+
     const transfer: FileTransfer = {
       fileId,
       fileName,
@@ -1681,6 +1464,16 @@ export const Sharing = (role: "host" | "client") => {
       lastChunkIndex: existingTransfer ? existingTransfer.lastChunkIndex : -1,
       speedWindow: [],
       isPaused: false,
+      udpSocket,
+      udpPort: UDP_PORT,
+      receivedChunkIndices: new Set(
+        existingTransfer
+          ? Array.from(
+              { length: existingTransfer.lastChunkIndex + 1 },
+              (_, i) => i
+            )
+          : []
+      ),
     };
     fileTransfers.set(fileId, transfer);
 
@@ -1698,6 +1491,350 @@ export const Sharing = (role: "host" | "client") => {
           isPaused: false,
         },
       ];
+    });
+
+    udpSocket.on("message", async (msg, rinfo) => {
+      if (rinfo.address !== socket.remoteAddress) {
+        Logger.warn(
+          `Ignoring UDP message from unexpected source ${rinfo.address}`
+        );
+        return;
+      }
+
+      try {
+        const dataStr = msg.toString();
+        if (!dataStr.startsWith("BATCH:")) {
+          Logger.warn(`Unexpected UDP data from ${rinfo.address}: ${dataStr}`);
+          return;
+        }
+
+        const nextDoubleNewline = msg.indexOf(Buffer.from("\n\n"));
+        if (nextDoubleNewline === -1) {
+          Logger.info(
+            `Incomplete BATCH header from ${rinfo.address}, waiting...`
+          );
+          return;
+        }
+
+        const headerStr = msg.slice(6, nextDoubleNewline).toString();
+        let batchData: {
+          fileId: string;
+          batchIndex: number;
+          chunkCount: number;
+        };
+        try {
+          batchData = JSON.parse(headerStr);
+        } catch (error) {
+          Logger.error(
+            `Failed to parse BATCH header for fileId ${fileId}: ${headerStr}`,
+            error
+          );
+          throw new DropShareError(
+            ERROR_CODES.INVALID_HEADER,
+            "Invalid batch header"
+          );
+        }
+
+        if (batchData.fileId !== transfer.fileId) {
+          Logger.warn(
+            `Ignoring batch for different fileId ${batchData.fileId}, expected ${transfer.fileId}`
+          );
+          return;
+        }
+
+        if (transfer.isPaused) {
+          Logger.info(
+            `Received batch ${batchData.batchIndex} for ${fileId} while paused, queuing`
+          );
+          return;
+        }
+
+        let bufferPosition = nextDoubleNewline + 2;
+        const batchChunks: { index: number; decryptedData: Buffer }[] = [];
+        let totalBytesReceived = 0;
+        const batchStartTime = Date.now();
+
+        for (let i = 0; i < batchData.chunkCount; i++) {
+          if (bufferPosition >= msg.length) {
+            Logger.info(
+              `Incomplete chunk data for ${batchData.fileId} in batch ${batchData.batchIndex}`
+            );
+            return;
+          }
+
+          const chunkHeaderEnd = msg.indexOf(
+            Buffer.from("\n\n"),
+            bufferPosition
+          );
+          if (chunkHeaderEnd === -1) {
+            Logger.info(
+              `Incomplete CHUNK header in batch ${batchData.batchIndex}, waiting...`
+            );
+            return;
+          }
+
+          const chunkHeaderStr = msg
+            .slice(bufferPosition + 6, chunkHeaderEnd)
+            .toString();
+          let chunkData: {
+            fileId: string;
+            chunkIndex: number;
+            chunkSize: number;
+          };
+          try {
+            chunkData = JSON.parse(chunkHeaderStr);
+          } catch (error) {
+            Logger.error(
+              `Failed to parse CHUNK header in batch ${batchData.batchIndex}: ${chunkHeaderStr}`,
+              error
+            );
+            throw new DropShareError(
+              ERROR_CODES.INVALID_HEADER,
+              "Invalid chunk header in batch"
+            );
+          }
+
+          const chunkStart = chunkHeaderEnd + 2;
+          const chunkEnd = chunkStart + chunkData.chunkSize;
+
+          if (msg.length < chunkEnd) {
+            Logger.info(
+              `Incomplete chunk data for ${chunkData.fileId} (chunkIndex: ${chunkData.chunkIndex})`
+            );
+            return;
+          }
+
+          const encryptedChunk = msg.slice(chunkStart, chunkEnd);
+          if (encryptedChunk.length !== chunkData.chunkSize) {
+            Logger.error(
+              `Chunk size mismatch for ${chunkData.fileId} (chunkIndex: ${chunkData.chunkIndex}): expected ${chunkData.chunkSize}, received ${encryptedChunk.length}`
+            );
+            throw new DropShareError(
+              ERROR_CODES.CORRUPTED_CHUNK,
+              `Chunk size mismatch: expected ${chunkData.chunkSize}, received ${encryptedChunk.length}`
+            );
+          }
+
+          if (encryptedChunk.length % 16 !== 0) {
+            Logger.error(
+              `Invalid encrypted chunk length for ${chunkData.fileId} (chunkIndex: ${chunkData.chunkIndex}): ${encryptedChunk.length} bytes`
+            );
+            throw new DropShareError(
+              ERROR_CODES.CORRUPTED_CHUNK,
+              `Invalid encrypted chunk length: ${encryptedChunk.length} bytes`
+            );
+          }
+
+          if (!transfer.receivedChunkIndices.has(chunkData.chunkIndex)) {
+            transfer.status = "Decrypting";
+            fileTransfers.set(fileId, transfer);
+            setTransferProgress?.((prev) => {
+              const updated = prev.filter((p) => p.fileId !== fileId);
+              return [
+                ...updated,
+                {
+                  fileId: transfer.fileId,
+                  fileName: transfer.fileName,
+                  transferredBytes: transfer.receivedBytes,
+                  fileSize: transfer.totalSize,
+                  speed: 0,
+                  status: transfer.status,
+                  error: transfer.error,
+                  isPaused: transfer.isPaused,
+                },
+              ];
+            });
+
+            const decryptedData = await CryptoUtil.decryptChunk(
+              encryptedChunk,
+              Buffer.from(transfer.aesKey!, "hex"),
+              Buffer.from(transfer.iv!, "hex")
+            );
+
+            transfer.status = "Receiving";
+            fileTransfers.set(fileId, transfer);
+            setTransferProgress?.((prev) => {
+              const updated = prev.filter((p) => p.fileId !== fileId);
+              return [
+                ...updated,
+                {
+                  fileId: transfer.fileId,
+                  fileName: transfer.fileName,
+                  transferredBytes: transfer.receivedBytes,
+                  fileSize: transfer.totalSize,
+                  speed: 0,
+                  status: transfer.status,
+                  error: transfer.error,
+                  isPaused: transfer.isPaused,
+                },
+              ];
+            });
+
+            transfer.chunks[chunkData.chunkIndex] = decryptedData;
+            transfer.receivedChunkIndices.add(chunkData.chunkIndex);
+            batchChunks.push({ index: chunkData.chunkIndex, decryptedData });
+            Logger.info(
+              `Received and decrypted chunk ${chunkData.chunkIndex}/${totalChunks} for ${fileId} (${decryptedData.length} bytes)`
+            );
+          } else {
+            Logger.info(
+              `Received duplicate chunk ${chunkData.chunkIndex} for ${fileId}, ignoring`
+            );
+          }
+
+          totalBytesReceived += encryptedChunk.length;
+          bufferPosition = chunkEnd;
+        }
+
+        Logger.info(
+          `Received batch ${batchData.batchIndex} for ${batchData.fileId} (${
+            batchData.chunkCount
+          } chunks) in ${(Date.now() - batchStartTime) / 1000} seconds via UDP`
+        );
+
+        if (batchChunks.length > 0) {
+          const batchDataBuffer = Buffer.concat(
+            batchChunks
+              .sort((a, b) => a.index - b.index)
+              .map((c) => c.decryptedData)
+          );
+          const base64Batch = batchDataBuffer.toString("base64");
+          await RNFS.appendFile(tempPath, base64Batch, "base64");
+
+          transfer.receivedBytes += batchDataBuffer.length;
+          transfer.progress =
+            (transfer.receivedBytes / transfer.totalSize) * 100;
+          transfer.lastChunkIndex = Math.max(
+            transfer.lastChunkIndex,
+            ...batchChunks.map((c) => c.index)
+          );
+          fileTransfers.set(fileId, transfer);
+
+          await ChunkStorage.storeTransfer(
+            fileId,
+            transfer.fileName,
+            transfer.fileSize,
+            transfer.totalChunks,
+            transfer.chunkSize,
+            transfer.lastChunkIndex,
+            tempPath
+          );
+
+          const ackBuffer = Buffer.from(
+            `ACK_BATCH:${fileId}:${batchData.batchIndex}:${batchData.chunkCount}\n`
+          );
+          socket.write(ackBuffer);
+          updateTransferSpeed(transfer, ackBuffer.length, setTransferProgress);
+          Logger.info(
+            `Sent ACK_BATCH:${batchData.batchIndex} for ${fileId} (${batchData.chunkCount} chunks)`
+          );
+        }
+
+        if (
+          transfer.receivedBytes >= transfer.totalSize &&
+          transfer.receivedChunkIndices.size === transfer.totalChunks
+        ) {
+          if (!(await RNFS.exists(SAVE_PATH))) {
+            await RNFS.mkdir(SAVE_PATH);
+            Logger.info(`Created directory ${SAVE_PATH}`);
+          }
+
+          const sanitizedFileName = transfer.fileName.replace(
+            /[^a-zA-Z0-9.-]/g,
+            "_"
+          );
+          const fileNameParts = sanitizedFileName.split(".");
+          const fileExtension =
+            fileNameParts.length > 1 ? fileNameParts.pop() : "";
+          const baseName = fileNameParts.join(".");
+          const finalfileName = `${baseName}_DropShare_${formatDate(
+            new Date()
+          )}.${fileExtension}`;
+          const finalPath = `${SAVE_PATH}/${finalfileName}`;
+
+          try {
+            await RNFS.moveFile(tempPath, finalPath);
+            setReceivedFiles((prev) => [...prev, finalPath]);
+            Logger.info(
+              `Received and saved file: ${finalPath} from ${transfer.deviceName}`
+            );
+            transfer.status = "Completed";
+            transfer.endTime = Date.now();
+            const ackCompleteBuffer = Buffer.from(`ACK_COMPLETE:${fileId}\n`);
+            socket.write(ackCompleteBuffer);
+            updateTransferSpeed(
+              transfer,
+              ackCompleteBuffer.length,
+              setTransferProgress
+            );
+
+            setTransferProgress?.((prev) => {
+              const updated = prev.filter((p) => p.fileId !== fileId);
+              return [
+                ...updated,
+                {
+                  fileId,
+                  fileName: transfer.fileName,
+                  transferredBytes: transfer.receivedBytes,
+                  fileSize: transfer.totalSize,
+                  speed:
+                    transfer.receivedBytes /
+                    ((Date.now() - transfer.startTime) / 1000 || 1),
+                  status: "Completed",
+                  isPaused: false,
+                },
+              ];
+            });
+
+            await ChunkStorage.deleteTransfer(fileId);
+          } catch (error) {
+            Logger.error(`Failed to move file to ${finalPath}`, error);
+            throw new DropShareError(
+              ERROR_CODES.DATABASE_WRITE_ERROR,
+              `Failed to save file: ${
+                error instanceof Error ? error.message : "Unknown error"
+              }`
+            );
+          } finally {
+            if (await RNFS.exists(tempPath)) {
+              await RNFS.unlink(tempPath).catch((err) =>
+                Logger.error(`Failed to delete temp file ${tempPath}`, err)
+              );
+            }
+            if (transfer.udpSocket) {
+              transfer.udpSocket.close();
+              Logger.info(`Closed UDP socket for transfer ${fileId}`);
+            }
+            fileTransfers.delete(fileId);
+            receivingFile = false;
+            fileId = "";
+          }
+        }
+      } catch (error) {
+        Logger.error(
+          `Error processing UDP batch for ${transfer.fileId} from ${rinfo.address}`,
+          error
+        );
+        socket.write(
+          Buffer.from(
+            `ERROR:${ERROR_CODES.NETWORK_ERROR}:UDP batch processing failed\n`
+          )
+        );
+      }
+    });
+
+    udpSocket.on("error", (err) => {
+      Logger.error(`UDP socket error for ${fileId}`, err);
+      socket.write(
+        Buffer.from(`ERROR:${ERROR_CODES.NETWORK_ERROR}:UDP socket error\n`)
+      );
+      if (transfer.udpSocket) {
+        transfer.udpSocket.close();
+        Logger.info(`Closed UDP socket for transfer ${fileId}`);
+      }
+      fileTransfers.delete(fileId);
+      receivingFile = false;
+      fileId = "";
     });
   }
 

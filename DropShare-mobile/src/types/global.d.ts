@@ -12,6 +12,58 @@ declare global {
     message: string;
   }
 
+  // interface TransferProgress {
+  //   fileId: string;
+  //   fileName: string;
+  //   transferredBytes: number;
+  //   fileSize: number;
+  //   speed: number;
+  //   status:
+  //     | "Sending"
+  //     | "Receiving"
+  //     | "Completed"
+  //     | "Failed"
+  //     | "Encrypting"
+  //     | "Decrypting"
+  //     | "Paused"
+  //     | "Cancelled";
+  //   error?: string;
+  //   isPaused: boolean;
+  // }
+
+  // interface FileTransfer {
+  //   fileId: string;
+  //   fileName: string;
+  //   fileSize: number;
+  //   deviceName: string;
+  //   senderIp: string;
+  //   chunks: Buffer[];
+  //   receivedBytes: number;
+  //   startTime: number;
+  //   totalChunks: number;
+  //   chunkSize: number;
+  //   totalSize: number;
+  //   chunkHashes: string[];
+  //   status:
+  //     | "Sending"
+  //     | "Receiving"
+  //     | "Completed"
+  //     | "Failed"
+  //     | "Encrypting"
+  //     | "Decrypting"
+  //     | "Paused"
+  //     | "Cancelled";
+  //   progress: number;
+  //   endTime?: number;
+  //   error?: string;
+  //   aesKey?: string;
+  //   iv?: string;
+  //   lastChunkIndex: number;
+  //   speedWindow: { bytes: number; timestamp: number }[];
+  //   isPaused: boolean;
+  //   pauseResolve?: () => void;
+  // }
+
   interface TransferProgress {
     fileId: string;
     fileName: string;
@@ -31,6 +83,7 @@ declare global {
     isPaused: boolean;
   }
 
+  // Extend FileTransfer to include UDP socket and port
   interface FileTransfer {
     fileId: string;
     fileName: string;
@@ -56,13 +109,16 @@ declare global {
     progress: number;
     endTime?: number;
     error?: string;
-    aesKey?: string;
-    iv?: string;
+    aesKey?: string; // Hex-encoded
+    iv?: string; // Hex-encoded
     lastChunkIndex: number;
     speedWindow: { bytes: number; timestamp: number }[];
     isPaused: boolean;
     pauseResolve?: () => void;
+    udpSocket?: UdpSocket; // Added for receiver
+    udpPort?: number; // Added for receiver
   }
+
   interface UdpSocket {
     bind(port: number): void;
     on(event: "listening", listener: () => void): void;

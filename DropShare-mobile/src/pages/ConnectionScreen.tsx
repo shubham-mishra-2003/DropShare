@@ -17,6 +17,8 @@ import { Toast } from "../components/Toasts";
 import { formatFileSize } from "../utils/FileSystemUtil";
 import BreakerText from "../components/ui/BreakerText";
 import { ConnectionScreenStyles } from "../constants/Styles";
+import { Logger } from "../utils/Logger";
+import { getLocalIPAddress } from "../utils/NetworkUtils";
 
 const ConnectionScreen: React.FC = () => {
   const { colorScheme } = useTheme();
@@ -77,42 +79,46 @@ const ConnectionScreen: React.FC = () => {
     return () => backHandler.remove();
   }, []);
 
-  // const [transferProgress, setTransfers] = useState<TransferProgress[]>([
+  // const [transferProgress, setTransferProgress] = useState<TransferProgress[]>([
   //   {
   //     fileId: "1",
-  //     fileName: "document.pdf",
-  //     transferredBytes: 5 * 1024,
-  //     fileSize: 10 * 1024,
-  //     speed: 1024,
-  //     status: "Sending",
-  //     isPaused: true,
+  //     fileName: "ADBC",
+  //     fileSize: 1234,
+  //     isPaused: false,
+  //     speed: 123,
+  //     status: "Cancelled",
+  //     transferredBytes: 12344,
+  //     pauseInitiator: "sender",
   //   },
   //   {
   //     fileId: "2",
-  //     fileName: "photo.jpg",
-  //     transferredBytes: 5 * 1024,
-  //     fileSize: 12.5 * 1024,
-  //     speed: 512,
-  //     status: "Receiving",
+  //     fileName: "ADBCED",
+  //     fileSize: 12343,
   //     isPaused: true,
+  //     speed: 1234,
+  //     status: "Receiving",
+  //     transferredBytes: 12344,
+  //     pauseInitiator: "sender",
   //   },
   //   {
   //     fileId: "3",
-  //     fileName: "video.mp4",
-  //     transferredBytes: 5 * 1024,
-  //     fileSize: 10 * 1024,
-  //     speed: 20480 * 20,
-  //     status: "Sending",
-  //     isPaused: false,
+  //     fileName: "ADBCED",
+  //     fileSize: 12343,
+  //     isPaused: true,
+  //     speed: 1234,
+  //     status: "Receiving",
+  //     transferredBytes: 12344,
+  //     pauseInitiator: "receiver",
   //   },
   //   {
   //     fileId: "4",
-  //     fileName: "video.mp4",
-  //     transferredBytes: 5 * 1024,
-  //     fileSize: 10 * 1024,
-  //     speed: 20480 * 20,
-  //     status: "Cancelled",
-  //     isPaused: false,
+  //     fileName: "ADBCED",
+  //     fileSize: 123,
+  //     isPaused: true,
+  //     speed: 224,
+  //     status: "Sending",
+  //     transferredBytes: 12344,
+  //     pauseInitiator: "receiver",
   //   },
   // ]);
 
@@ -132,9 +138,25 @@ const ConnectionScreen: React.FC = () => {
     }
   });
 
+  const [localIp, setLocalIp] = useState<string>("");
+  useEffect(() => {
+    getLocalIPAddress()
+      .then((ip) => setLocalIp(ip))
+      .catch((err) => {
+        Logger.error("Failed to get local IP:", err);
+        setLocalIp("unknown");
+      });
+  }, []);
+
   const renderTransferItem = ({ item }: { item: TransferProgress }) => {
     const percentage =
       item.fileSize > 0 ? (item.transferredBytes / item.fileSize) * 100 : 0;
+    const isSender = localIp && item.senderIp === localIp;
+    const canResume =
+      item.isPaused &&
+      (item.pausedBy
+        ? item.pausedBy === (isSender ? "sender" : "receiver")
+        : true);
 
     return (
       <View style={styles.transferInfo}>
@@ -157,12 +179,21 @@ const ConnectionScreen: React.FC = () => {
           {item.status != "Completed" && item.status != "Cancelled" && (
             <View style={{ flexDirection: "row", gap: 5 }}>
               <TouchableOpacity
-                style={{ padding: 2 }}
-                onPress={() =>
+                style={{
+                  padding: 5,
+                  opacity: canResume ? 1 : 0.5,
+                  backgroundColor: Colors[colorScheme].tint,
+                  borderRadius: 50,
+                }}
+                onPress={() => {
+                  Logger.info(
+                    `Render transfer ${item.fileId}: isSender=${isSender}, isPaused=${item.isPaused}, pauseInitiator=${item.pausedBy}, canResume=${canResume}`
+                  );
                   item.isPaused
                     ? resumeTransfer(item.fileId)
-                    : pauseTransfer(item.fileId)
-                }
+                    : pauseTransfer(item.fileId);
+                }}
+                disabled={item.isPaused && !canResume}
               >
                 <Icon
                   source={item.isPaused ? icons.resume : icons.pause}
@@ -172,7 +203,11 @@ const ConnectionScreen: React.FC = () => {
                 />
               </TouchableOpacity>
               <TouchableOpacity
-                style={{ padding: 2 }}
+                style={{
+                  padding: 5,
+                  backgroundColor: Colors[colorScheme].tint,
+                  borderRadius: 50,
+                }}
                 onPress={() => cancelTransfer(item.fileId)}
               >
                 <Icon source={icons.cross} filter={1} height={22} width={20} />
@@ -186,7 +221,7 @@ const ConnectionScreen: React.FC = () => {
             {formatFileSize(item.fileSize)}
           </StyledText>
           <StyledText fontSize={12} fontWeight="bold">
-            Speed: {formatFileSize(item.speed * 20)}/s
+            Speed: {formatFileSize(item.speed)}/s
           </StyledText>
         </View>
         {item.status != "Completed" && item.status != "Cancelled" && (

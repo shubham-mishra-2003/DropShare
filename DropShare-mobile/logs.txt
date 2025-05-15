@@ -1,0 +1,251 @@
+Sender's logs
+[DEBUG] 2025-05-15 13:47:49.486 - Raw key Base64: 81a390289a74b517676e... (length: 96)
+Logger.ts:103 [DEBUG] 2025-05-15 13:47:49.487 - Raw IV Base64: 5a3a7cec43d4a7ee4c74... (length: 48)
+Logger.ts:103 [DEBUG] 2025-05-15 13:47:49.488 - Decoded key length: 72 bytes
+Logger.ts:103 [DEBUG] 2025-05-15 13:47:49.489 - Decoded IV length: 36 bytes
+Logger.ts:69 [INFO] 2025-05-15 13:47:49.490 - Generated key hex: f356b7f74dbcf5aef86f...
+Logger.ts:69 [INFO] 2025-05-15 13:47:49.490 - Generated IV hex: e5addaedc79ce377786b...
+Logger.ts:69 [INFO] 2025-05-15 13:47:49.993 - Starting sendFile attempt 1 for realme 10 Pro+ 5G_IMG-20250510-WA0004.jpg
+Logger.ts:69 [INFO] 2025-05-15 13:47:49.998 - Sent header for realme 10 Pro+ 5G_IMG-20250510-WA0004.jpg: {"protocolVersion":"1.0","name":"IMG-20250510-WA0004.jpg","size":748242,"sender":"realme 10 Pro+ 5G","fileId":"realme 10 Pro+ 5G_IMG-20250510-WA0004.jpg","totalChunks":12,"chunkSize":62354,"totalBatches":3,"maxChunksPerBatch":5,"aesKey":"f356b7f74dbcf5aef86f9d7bebbe9ed9cd9be5ed1cf1ed1f6f47b7e9ef3575b7","iv":"e5addaedc79ce377786bb79ee1cef873"}
+Logger.ts:69 [INFO] 2025-05-15 13:47:50.199 - Received buffer size : 51
+Logger.ts:69 [INFO] 2025-05-15 13:47:50.215 - Processed ACK_FILE:realme 10 Pro+ 5G_IMG-20250510-WA0004.jpg
+Logger.ts:69 [INFO] 2025-05-15 13:47:50.218 - Received for ACK_FILE: ACK_FILE:realme 10 Pro+ 5G_IMG-20250510-WA0004.jpg
+
+Logger.ts:69 [INFO] 2025-05-15 13:47:50.222 - Encrypting chunk: data length=62354, key=f356b7f74d..., iv=e5addaedc7...
+Logger.ts:69 [INFO] 2025-05-15 13:47:50.363 - Prepared encrypted chunk 0/12 for realme 10 Pro+ 5G_IMG-20250510-WA0004.jpg (83152 bytes)
+Logger.ts:69 [INFO] 2025-05-15 13:47:50.364 - Encrypting chunk: data length=62354, key=f356b7f74d..., iv=e5addaedc7...
+Logger.ts:69 [INFO] 2025-05-15 13:47:50.508 - Prepared encrypted chunk 1/12 for realme 10 Pro+ 5G_IMG-20250510-WA0004.jpg (83152 bytes)
+Logger.ts:69 [INFO] 2025-05-15 13:47:50.509 - Encrypting chunk: data length=62354, key=f356b7f74d..., iv=e5addaedc7...
+Logger.ts:69 [INFO] 2025-05-15 13:47:50.625 - Prepared encrypted chunk 2/12 for realme 10 Pro+ 5G_IMG-20250510-WA0004.jpg (83152 bytes)
+Logger.ts:69 [INFO] 2025-05-15 13:47:50.627 - Encrypting chunk: data length=62354, key=f356b7f74d..., iv=e5addaedc7...
+Logger.ts:69 [INFO] 2025-05-15 13:47:50.743 - Prepared encrypted chunk 3/12 for realme 10 Pro+ 5G_IMG-20250510-WA0004.jpg (83152 bytes)
+Logger.ts:69 [INFO] 2025-05-15 13:47:50.744 - Encrypting chunk: data length=62354, key=f356b7f74d..., iv=e5addaedc7...
+Logger.ts:69 [INFO] 2025-05-15 13:47:50.854 - Prepared encrypted chunk 4/12 for realme 10 Pro+ 5G_IMG-20250510-WA0004.jpg (83152 bytes)
+Logger.ts:69 [INFO] 2025-05-15 13:47:50.960 - Sent batch 0/3 for realme 10 Pro+ 5G_IMG-20250510-WA0004.jpg (5 chunks)
+Logger.ts:69 [INFO] 2025-05-15 13:47:57.294 - Received buffer size : 56
+Logger.ts:69 [INFO] 2025-05-15 13:47:57.300 - Processed ACK_BATCH:realme 10 Pro+ 5G_IMG-20250510-WA0004.jpg:0:5
+Logger.ts:69 [INFO] 2025-05-15 13:47:57.312 - Received for ACK_BATCH:0: ACK_BATCH:realme 10 Pro+ 5G_IMG-20250510-WA0004.jpg:0:5
+
+Logger.ts:69 [INFO] 2025-05-15 13:47:57.315 - Encrypting chunk: data length=62354, key=f356b7f74d..., iv=e5addaedc7...
+Logger.ts:69 [INFO] 2025-05-15 13:47:57.448 - Prepared encrypted chunk 5/12 for realme 10 Pro+ 5G_IMG-20250510-WA0004.jpg (83152 bytes)
+Logger.ts:69 [INFO] 2025-05-15 13:47:57.449 - Encrypting chunk: data length=62354, key=f356b7f74d..., iv=e5addaedc7...
+Logger.ts:69 [INFO] 2025-05-15 13:47:57.562 - Prepared encrypted chunk 6/12 for realme 10 Pro+ 5G_IMG-20250510-WA0004.jpg (83152 bytes)
+Logger.ts:69 [INFO] 2025-05-15 13:47:57.563 - Encrypting chunk: data length=62354, key=f356b7f74d..., iv=e5addaedc7...
+Logger.ts:69 [INFO] 2025-05-15 13:47:57.680 - Prepared encrypted chunk 7/12 for realme 10 Pro+ 5G_IMG-20250510-WA0004.jpg (83152 bytes)
+Logger.ts:69 [INFO] 2025-05-15 13:47:57.681 - Encrypting chunk: data length=62354, key=f356b7f74d..., iv=e5addaedc7...
+Logger.ts:69 [INFO] 2025-05-15 13:47:57.818 - Prepared encrypted chunk 8/12 for realme 10 Pro+ 5G_IMG-20250510-WA0004.jpg (83152 bytes)
+Logger.ts:69 [INFO] 2025-05-15 13:47:57.819 - Encrypting chunk: data length=62354, key=f356b7f74d..., iv=e5addaedc7...
+Logger.ts:69 [INFO] 2025-05-15 13:47:57.939 - Prepared encrypted chunk 9/12 for realme 10 Pro+ 5G_IMG-20250510-WA0004.jpg (83152 bytes)
+Logger.ts:69 [INFO] 2025-05-15 13:47:58.044 - Sent batch 1/3 for realme 10 Pro+ 5G_IMG-20250510-WA0004.jpg (5 chunks)
+Logger.ts:69 [INFO] 2025-05-15 13:48:06.271 - Received buffer size : 56
+Logger.ts:69 [INFO] 2025-05-15 13:48:06.278 - Processed ACK_BATCH:realme 10 Pro+ 5G_IMG-20250510-WA0004.jpg:1:5
+Logger.ts:69 [INFO] 2025-05-15 13:48:06.283 - Received for ACK_BATCH:1: ACK_BATCH:realme 10 Pro+ 5G_IMG-20250510-WA0004.jpg:1:5
+
+Logger.ts:69 [INFO] 2025-05-15 13:48:06.287 - Encrypting chunk: data length=62354, key=f356b7f74d..., iv=e5addaedc7...
+Logger.ts:69 [INFO] 2025-05-15 13:48:06.429 - Prepared encrypted chunk 10/12 for realme 10 Pro+ 5G_IMG-20250510-WA0004.jpg (83152 bytes)
+Logger.ts:69 [INFO] 2025-05-15 13:48:06.430 - Encrypting chunk: data length=62348, key=f356b7f74d..., iv=e5addaedc7...
+Logger.ts:69 [INFO] 2025-05-15 13:48:06.546 - Prepared encrypted chunk 11/12 for realme 10 Pro+ 5G_IMG-20250510-WA0004.jpg (83136 bytes)
+Logger.ts:69 [INFO] 2025-05-15 13:48:06.592 - Sent batch 2/3 for realme 10 Pro+ 5G_IMG-20250510-WA0004.jpg (2 chunks)
+Logger.ts:69 [INFO] 2025-05-15 13:48:07.652 - Received buffer size : 56
+Logger.ts:69 [INFO] 2025-05-15 13:48:07.654 - Processed ACK_BATCH:realme 10 Pro+ 5G_IMG-20250510-WA0004.jpg:2:2
+Logger.ts:69 [INFO] 2025-05-15 13:48:07.656 - Received for ACK_BATCH:2: ACK_BATCH:realme 10 Pro+ 5G_IMG-20250510-WA0004.jpg:2:2
+
+Logger.ts:69 [INFO] 2025-05-15 13:48:08.839 - Received buffer size : 55
+Logger.ts:69 [INFO] 2025-05-15 13:48:08.840 - Processed ACK_COMPLETE:realme 10 Pro+ 5G_IMG-20250510-WA0004.jpg
+Logger.ts:69 [INFO] 2025-05-15 13:48:08.842 - Received for ACK_COMPLETE: ACK_COMPLETE:realme 10 Pro+ 5G_IMG-20250510-WA0004.jpg
+
+Logger.ts:69 [INFO] 2025-05-15 13:48:08.843 - Sent file: IMG-20250510-WA0004.jpg from realme 10 Pro+ 5G to all clients
+Logger.ts:115 [TOAST:INFO] 2025-05-15 13:48:08.844 - Sent file IMG-20250510-WA0004.jpg
+Logger.ts:115 [TOAST:INFO] 2025-05-15 13:48:08.844 - Sent 1 file(s)
+
+
+Receiver's logs
+[INFO] 2025-05-15 13:47:49.331 - Received buffer size : 351
+Logger.ts:69 [INFO] 2025-05-15 13:47:50.297 - Received buffer size : 2896
+Logger.ts:69 [INFO] 2025-05-15 13:47:50.304 - Waiting for chunk data for realme 10 Pro+ 5G_IMG-20250510-WA0004.jpg (chunkIndex: 0, expected 83152 bytes)
+Logger.ts:69 [INFO] 2025-05-15 13:47:50.329 - Received buffer size : 14480
+Logger.ts:69 [INFO] 2025-05-15 13:47:50.360 - Received buffer size : 23168
+Logger.ts:69 [INFO] 2025-05-15 13:47:50.389 - Received buffer size : 33304
+Logger.ts:69 [INFO] 2025-05-15 13:47:50.410 - Received buffer size : 34752
+Logger.ts:69 [INFO] 2025-05-15 13:47:50.434 - Received buffer size : 43440
+Logger.ts:69 [INFO] 2025-05-15 13:47:50.465 - Received buffer size : 60816
+Logger.ts:69 [INFO] 2025-05-15 13:47:50.503 - Received buffer size : 75296
+Logger.ts:69 [INFO] 2025-05-15 13:47:50.538 - Received buffer size : 76744
+Logger.ts:69 [INFO] 2025-05-15 13:47:50.576 - Received buffer size : 82536
+Logger.ts:69 [INFO] 2025-05-15 13:47:50.614 - Received buffer size : 83984
+Logger.ts:69 [INFO] 2025-05-15 13:47:50.659 - Received buffer size : 91224
+Logger.ts:69 [INFO] 2025-05-15 13:47:50.705 - Received buffer size : 99912
+Logger.ts:69 [INFO] 2025-05-15 13:47:50.752 - Received buffer size : 101360
+Logger.ts:69 [INFO] 2025-05-15 13:47:50.802 - Received buffer size : 108600
+Logger.ts:69 [INFO] 2025-05-15 13:47:50.856 - Received buffer size : 118736
+Logger.ts:69 [INFO] 2025-05-15 13:47:50.912 - Received buffer size : 120184
+Logger.ts:69 [INFO] 2025-05-15 13:47:50.970 - Received buffer size : 127424
+Logger.ts:69 [INFO] 2025-05-15 13:47:51.035 - Received buffer size : 139008
+Logger.ts:69 [INFO] 2025-05-15 13:47:51.103 - Received buffer size : 149144
+Logger.ts:69 [INFO] 2025-05-15 13:47:51.174 - Received buffer size : 153488
+Logger.ts:69 [INFO] 2025-05-15 13:47:51.244 - Received buffer size : 154936
+Logger.ts:69 [INFO] 2025-05-15 13:47:51.316 - Received buffer size : 160728
+Logger.ts:69 [INFO] 2025-05-15 13:47:51.392 - Received buffer size : 167968
+Logger.ts:69 [INFO] 2025-05-15 13:47:51.479 - Received buffer size : 188240
+Logger.ts:69 [INFO] 2025-05-15 13:47:51.580 - Received buffer size : 211408
+Logger.ts:69 [INFO] 2025-05-15 13:47:51.680 - Received buffer size : 220096
+Logger.ts:69 [INFO] 2025-05-15 13:47:51.787 - Received buffer size : 221544
+Logger.ts:69 [INFO] 2025-05-15 13:47:51.897 - Received buffer size : 222992
+Logger.ts:69 [INFO] 2025-05-15 13:47:51.998 - Received buffer size : 228784
+Logger.ts:69 [INFO] 2025-05-15 13:47:52.106 - Received buffer size : 234576
+Logger.ts:69 [INFO] 2025-05-15 13:47:52.213 - Received buffer size : 240368
+Logger.ts:69 [INFO] 2025-05-15 13:47:52.319 - Received buffer size : 241816
+Logger.ts:69 [INFO] 2025-05-15 13:47:52.431 - Received buffer size : 253400
+Logger.ts:69 [INFO] 2025-05-15 13:47:52.548 - Received buffer size : 262088
+Logger.ts:69 [INFO] 2025-05-15 13:47:52.668 - Received buffer size : 270776
+Logger.ts:69 [INFO] 2025-05-15 13:47:52.794 - Received buffer size : 278016
+Logger.ts:69 [INFO] 2025-05-15 13:47:52.924 - Received buffer size : 279464
+Logger.ts:69 [INFO] 2025-05-15 13:47:53.057 - Received buffer size : 285256
+Logger.ts:69 [INFO] 2025-05-15 13:47:53.192 - Received buffer size : 289600
+Logger.ts:69 [INFO] 2025-05-15 13:47:53.335 - Received buffer size : 312768
+Logger.ts:69 [INFO] 2025-05-15 13:47:53.477 - Received buffer size : 320008
+Logger.ts:69 [INFO] 2025-05-15 13:47:53.621 - Received buffer size : 325800
+Logger.ts:69 [INFO] 2025-05-15 13:47:53.788 - Received buffer size : 333040
+Logger.ts:69 [INFO] 2025-05-15 13:47:53.941 - Received buffer size : 340280
+Logger.ts:69 [INFO] 2025-05-15 13:47:54.094 - Received buffer size : 347520
+Logger.ts:69 [INFO] 2025-05-15 13:47:54.250 - Received buffer size : 353312
+Logger.ts:69 [INFO] 2025-05-15 13:47:54.438 - Received buffer size : 357656
+Logger.ts:69 [INFO] 2025-05-15 13:47:54.598 - Received buffer size : 362000
+Logger.ts:69 [INFO] 2025-05-15 13:47:54.765 - Received buffer size : 366344
+Logger.ts:69 [INFO] 2025-05-15 13:47:54.946 - Received buffer size : 396752
+Logger.ts:69 [INFO] 2025-05-15 13:47:55.132 - Received buffer size : 402544
+Logger.ts:69 [INFO] 2025-05-15 13:47:55.310 - Received buffer size : 403992
+Logger.ts:69 [INFO] 2025-05-15 13:47:55.487 - Received buffer size : 408336
+Logger.ts:69 [INFO] 2025-05-15 13:47:55.678 - Received buffer size : 412680
+Logger.ts:69 [INFO] 2025-05-15 13:47:55.862 - Received buffer size : 416327
+Logger.ts:69 [INFO] 2025-05-15 13:47:56.043 - Received batch 0 for realme 10 Pro+ 5G_IMG-20250510-WA0004.jpg (5 chunks) in 0.001 seconds
+Logger.ts:69 [INFO] 2025-05-15 13:47:56.044 - Decrypting chunk 0 for realme 10 Pro+ 5G_IMG-20250510-WA0004.jpg (83152 bytes)
+Logger.ts:69 [INFO] 2025-05-15 13:47:56.050 - Decrypting chunk: data length=83152, key=f356b7f74d..., iv=e5addaedc7...
+Logger.ts:69 [INFO] 2025-05-15 13:47:56.162 - Decrypting chunk 1 for realme 10 Pro+ 5G_IMG-20250510-WA0004.jpg (83152 bytes)
+Logger.ts:69 [INFO] 2025-05-15 13:47:56.163 - Decrypting chunk: data length=83152, key=f356b7f74d..., iv=e5addaedc7...
+Logger.ts:69 [INFO] 2025-05-15 13:47:56.237 - Decrypting chunk 2 for realme 10 Pro+ 5G_IMG-20250510-WA0004.jpg (83152 bytes)
+Logger.ts:69 [INFO] 2025-05-15 13:47:56.238 - Decrypting chunk: data length=83152, key=f356b7f74d..., iv=e5addaedc7...
+Logger.ts:69 [INFO] 2025-05-15 13:47:56.314 - Decrypting chunk 3 for realme 10 Pro+ 5G_IMG-20250510-WA0004.jpg (83152 bytes)
+Logger.ts:69 [INFO] 2025-05-15 13:47:56.315 - Decrypting chunk: data length=83152, key=f356b7f74d..., iv=e5addaedc7...
+Logger.ts:69 [INFO] 2025-05-15 13:47:56.383 - Decrypting chunk 4 for realme 10 Pro+ 5G_IMG-20250510-WA0004.jpg (83152 bytes)
+Logger.ts:69 [INFO] 2025-05-15 13:47:56.384 - Decrypting chunk: data length=83152, key=f356b7f74d..., iv=e5addaedc7...
+Logger.ts:69 [INFO] 2025-05-15 13:47:56.579 - Wrote batch 0 for realme 10 Pro+ 5G_IMG-20250510-WA0004.jpg to file in 0.537 seconds
+Logger.ts:69 [INFO] 2025-05-15 13:47:56.592 - Stored transfer metadata for fileId realme 10 Pro+ 5G_IMG-20250510-WA0004.jpg
+Logger.ts:69 [INFO] 2025-05-15 13:47:56.593 - Processed batch 0 for realme 10 Pro+ 5G_IMG-20250510-WA0004.jpg (5 chunks)
+Logger.ts:69 [INFO] 2025-05-15 13:47:57.479 - Received buffer size : 14480
+Logger.ts:69 [INFO] 2025-05-15 13:47:57.497 - Waiting for chunk data for realme 10 Pro+ 5G_IMG-20250510-WA0004.jpg (chunkIndex: 5, expected 83152 bytes)
+Logger.ts:69 [INFO] 2025-05-15 13:47:57.503 - Received buffer size : 17376
+Logger.ts:69 [INFO] 2025-05-15 13:47:57.527 - Received buffer size : 20272
+Logger.ts:69 [INFO] 2025-05-15 13:47:57.546 - Received buffer size : 23168
+Logger.ts:69 [INFO] 2025-05-15 13:47:57.564 - Received buffer size : 26064
+Logger.ts:69 [INFO] 2025-05-15 13:47:57.582 - Received buffer size : 30408
+Logger.ts:69 [INFO] 2025-05-15 13:47:57.605 - Received buffer size : 43440
+Logger.ts:69 [INFO] 2025-05-15 13:47:57.637 - Received buffer size : 60816
+Logger.ts:69 [INFO] 2025-05-15 13:47:57.667 - Received buffer size : 63712
+Logger.ts:69 [INFO] 2025-05-15 13:47:57.697 - Received buffer size : 65160
+Logger.ts:69 [INFO] 2025-05-15 13:47:57.733 - Received buffer size : 75296
+Logger.ts:69 [INFO] 2025-05-15 13:47:57.769 - Received buffer size : 78192
+Logger.ts:69 [INFO] 2025-05-15 13:47:57.806 - Received buffer size : 79640
+Logger.ts:69 [INFO] 2025-05-15 13:47:57.845 - Received buffer size : 85432
+Logger.ts:69 [INFO] 2025-05-15 13:47:57.889 - Received buffer size : 94120
+Logger.ts:69 [INFO] 2025-05-15 13:47:57.939 - Received buffer size : 104256
+Logger.ts:69 [INFO] 2025-05-15 13:47:57.986 - Received buffer size : 105704
+Logger.ts:69 [INFO] 2025-05-15 13:47:58.034 - Received buffer size : 107152
+Logger.ts:69 [INFO] 2025-05-15 13:47:58.090 - Received buffer size : 115840
+Logger.ts:69 [INFO] 2025-05-15 13:47:58.153 - Received buffer size : 134664
+Logger.ts:69 [INFO] 2025-05-15 13:47:58.218 - Received buffer size : 140456
+Logger.ts:69 [INFO] 2025-05-15 13:47:58.281 - Received buffer size : 141904
+Logger.ts:69 [INFO] 2025-05-15 13:47:58.350 - Received buffer size : 143352
+Logger.ts:69 [INFO] 2025-05-15 13:47:58.423 - Received buffer size : 147696
+Logger.ts:69 [INFO] 2025-05-15 13:47:58.491 - Received buffer size : 152040
+Logger.ts:69 [INFO] 2025-05-15 13:47:58.568 - Received buffer size : 153488
+Logger.ts:69 [INFO] 2025-05-15 13:47:58.641 - Received buffer size : 163624
+Logger.ts:69 [INFO] 2025-05-15 13:47:58.715 - Received buffer size : 165072
+Logger.ts:69 [INFO] 2025-05-15 13:47:58.794 - Received buffer size : 173760
+Logger.ts:69 [INFO] 2025-05-15 13:47:58.873 - Received buffer size : 178104
+Logger.ts:69 [INFO] 2025-05-15 13:47:58.956 - Received buffer size : 183896
+Logger.ts:69 [INFO] 2025-05-15 13:47:59.041 - Received buffer size : 189688
+Logger.ts:69 [INFO] 2025-05-15 13:47:59.128 - Received buffer size : 195480
+Logger.ts:69 [INFO] 2025-05-15 13:47:59.216 - Received buffer size : 198376
+Logger.ts:69 [INFO] 2025-05-15 13:47:59.307 - Received buffer size : 199824
+Logger.ts:69 [INFO] 2025-05-15 13:47:59.399 - Received buffer size : 205616
+Logger.ts:69 [INFO] 2025-05-15 13:47:59.502 - Received buffer size : 211408
+Logger.ts:69 [INFO] 2025-05-15 13:47:59.611 - Received buffer size : 225888
+Logger.ts:69 [INFO] 2025-05-15 13:47:59.716 - Received buffer size : 233128
+Logger.ts:69 [INFO] 2025-05-15 13:47:59.823 - Received buffer size : 238920
+Logger.ts:69 [INFO] 2025-05-15 13:47:59.931 - Received buffer size : 246160
+Logger.ts:69 [INFO] 2025-05-15 13:48:00.048 - Received buffer size : 256296
+Logger.ts:69 [INFO] 2025-05-15 13:48:00.168 - Received buffer size : 263536
+Logger.ts:69 [INFO] 2025-05-15 13:48:00.303 - Received buffer size : 267880
+Logger.ts:69 [INFO] 2025-05-15 13:48:00.422 - Received buffer size : 269328
+Logger.ts:69 [INFO] 2025-05-15 13:48:00.544 - Received buffer size : 275120
+Logger.ts:69 [INFO] 2025-05-15 13:48:00.682 - Received buffer size : 280912
+Logger.ts:69 [INFO] 2025-05-15 13:48:00.816 - Received buffer size : 286704
+Logger.ts:69 [INFO] 2025-05-15 13:48:00.942 - Received buffer size : 291048
+Logger.ts:69 [INFO] 2025-05-15 13:48:01.072 - Received buffer size : 295392
+Logger.ts:69 [INFO] 2025-05-15 13:48:01.231 - Received buffer size : 296840
+Logger.ts:69 [INFO] 2025-05-15 13:48:01.368 - Received buffer size : 298288
+Logger.ts:69 [INFO] 2025-05-15 13:48:01.503 - Received buffer size : 302632
+Logger.ts:69 [INFO] 2025-05-15 13:48:01.639 - Received buffer size : 308424
+Logger.ts:69 [INFO] 2025-05-15 13:48:01.806 - Received buffer size : 309872
+Logger.ts:69 [INFO] 2025-05-15 13:48:01.952 - Received buffer size : 314216
+Logger.ts:69 [INFO] 2025-05-15 13:48:02.092 - Received buffer size : 318560
+Logger.ts:69 [INFO] 2025-05-15 13:48:02.235 - Received buffer size : 322904
+Logger.ts:69 [INFO] 2025-05-15 13:48:02.398 - Received buffer size : 327248
+Logger.ts:69 [INFO] 2025-05-15 13:48:02.546 - Received buffer size : 331592
+Logger.ts:69 [INFO] 2025-05-15 13:48:02.694 - Received buffer size : 337384
+Logger.ts:69 [INFO] 2025-05-15 13:48:02.848 - Received buffer size : 344624
+Logger.ts:69 [INFO] 2025-05-15 13:48:03.033 - Received buffer size : 347520
+Logger.ts:69 [INFO] 2025-05-15 13:48:03.191 - Received buffer size : 348968
+Logger.ts:69 [INFO] 2025-05-15 13:48:03.348 - Received buffer size : 354760
+Logger.ts:69 [INFO] 2025-05-15 13:48:03.514 - Received buffer size : 359104
+Logger.ts:69 [INFO] 2025-05-15 13:48:03.695 - Received buffer size : 362000
+Logger.ts:69 [INFO] 2025-05-15 13:48:03.858 - Received buffer size : 364896
+Logger.ts:69 [INFO] 2025-05-15 13:48:04.023 - Received buffer size : 373584
+Logger.ts:69 [INFO] 2025-05-15 13:48:04.192 - Received buffer size : 376480
+Logger.ts:69 [INFO] 2025-05-15 13:48:04.370 - Received buffer size : 386616
+Logger.ts:69 [INFO] 2025-05-15 13:48:04.553 - Received buffer size : 396752
+Logger.ts:69 [INFO] 2025-05-15 13:48:04.740 - Received buffer size : 416327
+Logger.ts:69 [INFO] 2025-05-15 13:48:04.931 - Received batch 1 for realme 10 Pro+ 5G_IMG-20250510-WA0004.jpg (5 chunks) in 0 seconds
+Logger.ts:69 [INFO] 2025-05-15 13:48:04.932 - Decrypting chunk 5 for realme 10 Pro+ 5G_IMG-20250510-WA0004.jpg (83152 bytes)
+Logger.ts:69 [INFO] 2025-05-15 13:48:04.933 - Decrypting chunk: data length=83152, key=f356b7f74d..., iv=e5addaedc7...
+Logger.ts:69 [INFO] 2025-05-15 13:48:05.053 - Decrypting chunk 6 for realme 10 Pro+ 5G_IMG-20250510-WA0004.jpg (83152 bytes)
+Logger.ts:69 [INFO] 2025-05-15 13:48:05.054 - Decrypting chunk: data length=83152, key=f356b7f74d..., iv=e5addaedc7...
+Logger.ts:69 [INFO] 2025-05-15 13:48:05.160 - Decrypting chunk 7 for realme 10 Pro+ 5G_IMG-20250510-WA0004.jpg (83152 bytes)
+Logger.ts:69 [INFO] 2025-05-15 13:48:05.161 - Decrypting chunk: data length=83152, key=f356b7f74d..., iv=e5addaedc7...
+Logger.ts:69 [INFO] 2025-05-15 13:48:05.228 - Decrypting chunk 8 for realme 10 Pro+ 5G_IMG-20250510-WA0004.jpg (83152 bytes)
+Logger.ts:69 [INFO] 2025-05-15 13:48:05.230 - Decrypting chunk: data length=83152, key=f356b7f74d..., iv=e5addaedc7...
+Logger.ts:69 [INFO] 2025-05-15 13:48:05.295 - Decrypting chunk 9 for realme 10 Pro+ 5G_IMG-20250510-WA0004.jpg (83152 bytes)
+Logger.ts:69 [INFO] 2025-05-15 13:48:05.296 - Decrypting chunk: data length=83152, key=f356b7f74d..., iv=e5addaedc7...
+Logger.ts:69 [INFO] 2025-05-15 13:48:05.494 - Wrote batch 1 for realme 10 Pro+ 5G_IMG-20250510-WA0004.jpg to file in 0.563 seconds
+Logger.ts:69 [INFO] 2025-05-15 13:48:05.502 - Stored transfer metadata for fileId realme 10 Pro+ 5G_IMG-20250510-WA0004.jpg
+Logger.ts:69 [INFO] 2025-05-15 13:48:05.504 - Processed batch 1 for realme 10 Pro+ 5G_IMG-20250510-WA0004.jpg (5 chunks)
+Logger.ts:69 [INFO] 2025-05-15 13:48:05.947 - Received buffer size : 2896
+Logger.ts:69 [INFO] 2025-05-15 13:48:05.954 - Waiting for chunk data for realme 10 Pro+ 5G_IMG-20250510-WA0004.jpg (chunkIndex: 10, expected 83152 bytes)
+Logger.ts:69 [INFO] 2025-05-15 13:48:05.974 - Received buffer size : 13032
+Logger.ts:69 [INFO] 2025-05-15 13:48:05.990 - Received buffer size : 14480
+Logger.ts:69 [INFO] 2025-05-15 13:48:06.005 - Received buffer size : 15928
+Logger.ts:69 [INFO] 2025-05-15 13:48:06.023 - Received buffer size : 20272
+Logger.ts:69 [INFO] 2025-05-15 13:48:06.040 - Received buffer size : 23168
+Logger.ts:69 [INFO] 2025-05-15 13:48:06.059 - Received buffer size : 26064
+Logger.ts:69 [INFO] 2025-05-15 13:48:06.079 - Received buffer size : 37648
+Logger.ts:69 [INFO] 2025-05-15 13:48:06.108 - Received buffer size : 55024
+Logger.ts:69 [INFO] 2025-05-15 13:48:06.138 - Received buffer size : 63712
+Logger.ts:69 [INFO] 2025-05-15 13:48:06.172 - Received buffer size : 70952
+Logger.ts:69 [INFO] 2025-05-15 13:48:06.214 - Received buffer size : 85432
+Logger.ts:69 [INFO] 2025-05-15 13:48:06.261 - Received buffer size : 99912
+Logger.ts:69 [INFO] 2025-05-15 13:48:06.327 - Received buffer size : 131768
+Logger.ts:69 [INFO] 2025-05-15 13:48:06.386 - Received buffer size : 133216
+Logger.ts:69 [INFO] 2025-05-15 13:48:06.459 - Received buffer size : 153488
+Logger.ts:69 [INFO] 2025-05-15 13:48:06.527 - Received buffer size : 154936
+Logger.ts:69 [INFO] 2025-05-15 13:48:06.603 - Received buffer size : 166572
+Logger.ts:69 [INFO] 2025-05-15 13:48:06.676 - Received batch 2 for realme 10 Pro+ 5G_IMG-20250510-WA0004.jpg (2 chunks) in 0 seconds
+Logger.ts:69 [INFO] 2025-05-15 13:48:06.677 - Decrypting chunk 10 for realme 10 Pro+ 5G_IMG-20250510-WA0004.jpg (83152 bytes)
+Logger.ts:69 [INFO] 2025-05-15 13:48:06.678 - Decrypting chunk: data length=83152, key=f356b7f74d..., iv=e5addaedc7...
+Logger.ts:69 [INFO] 2025-05-15 13:48:06.795 - Decrypting chunk 11 for realme 10 Pro+ 5G_IMG-20250510-WA0004.jpg (83136 bytes)
+Logger.ts:69 [INFO] 2025-05-15 13:48:06.796 - Decrypting chunk: data length=83136, key=f356b7f74d..., iv=e5addaedc7...
+Logger.ts:69 [INFO] 2025-05-15 13:48:06.942 - Wrote batch 2 for realme 10 Pro+ 5G_IMG-20250510-WA0004.jpg to file in 0.266 seconds
+Logger.ts:69 [INFO] 2025-05-15 13:48:06.951 - Stored transfer metadata for fileId realme 10 Pro+ 5G_IMG-20250510-WA0004.jpg
+Logger.ts:69 [INFO] 2025-05-15 13:48:06.952 - Processed batch 2 for realme 10 Pro+ 5G_IMG-20250510-WA0004.jpg (2 chunks)
+Logger.ts:69 [INFO] 2025-05-15 13:48:08.137 - Received and saved file: /storage/emulated/0/DropShare/IMG-20250510-WA0004_DropShare_2025_05_15_13_48.jpg from realme 10 Pro+ 5G
+Logger.ts:69 [INFO] 2025-05-15 13:48:08.224 - Deleted transfer metadata for fileId realme 10 Pro+ 5G_IMG-20250510-WA0004.jpg
